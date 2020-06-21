@@ -16,6 +16,7 @@
     "rxjs": "^6.5.5"
   },
   "scripts": {
+    "test": "jest",
     "test:watch": "jest --watchAll",
     "scratch": "ts-node --project tsconfig.json scripts/scratch.ts"
   }

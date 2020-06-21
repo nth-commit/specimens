@@ -6,8 +6,8 @@ import Range, { Size, IntegerRange } from './Range';
 import Shrink from './Shrink';
 import Seed from './Seed';
 
-export const Skipped = Symbol();
-export const Exhausted = Symbol();
+export const Skipped = Symbol('Skipped');
+export const Exhausted = Symbol('Exhausted');
 export type Specimen<T> = T | typeof Skipped | typeof Exhausted;
 
 export namespace Specimen {
@@ -27,6 +27,40 @@ export namespace Specimen {
 export type Specimens<T> = Random<Specimen<RoseTree<T>>>;
 
 namespace Specimens {
+  type SpecimenExhaustionStrategy = {
+    recognize: (s: Specimen<unknown>) => void;
+    isExhausted: () => boolean;
+  };
+
+  const applyExhaustionStrategy = <T>(exhaustionStrategy: SpecimenExhaustionStrategy) =>
+    function* (specimen: Specimen<T>) {
+      if (exhaustionStrategy.isExhausted()) {
+        throw 'Error: Attempted to take from exhausted specimens';
+      }
+
+      yield specimen;
+
+      exhaustionStrategy.recognize(specimen);
+      if (exhaustionStrategy.isExhausted()) {
+        yield Exhausted;
+      }
+    };
+
+  const exhaustsAfterConsecutiveSkips = (maxNumberOfSkips: number): SpecimenExhaustionStrategy => {
+    let skipCount = 0;
+
+    return {
+      recognize: (s) => {
+        if (Specimen.isSkipped(s)) {
+          skipCount++;
+        } else {
+          skipCount = 0;
+        }
+      },
+      isExhausted: () => skipCount >= maxNumberOfSkips,
+    };
+  };
+
   const generatorForEach = <T>(generator: Generator<T>, action: (x: T) => void): void => {
     while (true) {
       const next = generator.next();
@@ -46,35 +80,8 @@ namespace Specimens {
   export const map = <T, U>(f: (x: T) => U, d: Specimens<T>): Specimens<U> =>
     Random.map((x) => (Specimen.isAccepted(x) ? RoseTree.map(f, x) : x), d);
 
-  // export const expand = <T, U>(fs: Array<(x: T) => U>, d: Data<T>): Data<U> =>
-  //   Random.expand(function* (x) {
-  //     if (isHit(x)) {
-  //       yield* RoseTree.expand(fs, x);
-  //     }
-  //   }, d);
-
-  export const filter = <T>(pred: (x: T) => boolean, d: Specimens<T>): Specimens<T> =>
-    Random.expand(function* (x) {
-      yield x;
-
-      // const expanded = missableToSequence(x).bind((t) => RoseTree.filter(pred, t));
-      // if (expanded.isEmpty()) {
-      //   yield Miss;
-      // } else {
-      //   yield* expanded;
-      // }
-
-      // if (isHit(x)) {
-      //   const trees = RoseTree.filter(pred, x);
-      //   if (trees.isEmpty()) {
-      //     yield Miss;
-      //   } else {
-      //     yield* trees;
-      //   }
-      // } else {
-      //   yield Miss;
-      // }
-    }, d);
+  export const filter = <T>(pred: (x: T) => boolean, specimens: Specimens<T>): Specimens<T> =>
+    Random.map((x) => (Specimen.isAccepted(x) && pred(RoseTree.outcome(x)) ? x : Skipped), specimens);
 
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> => {
     const r: Random<N> = Random.integral(numeric, range);
@@ -94,20 +101,21 @@ namespace Specimens {
     return map((ix) => arr[ix], integer(range));
   };
 
-  export const run = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Generator<Specimen<T>> => {
-    return Random.run(seed, size, specimens)
-      .map((x) => (Specimen.isAccepted(x) ? RoseTree.outcome(x) : x))
+  export const run = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Generator<Specimen<T>> =>
+    Random.run(seed, size, specimens)
+      .expand(applyExhaustionStrategy(exhaustsAfterConsecutiveSkips(10)))
+      .takeWhile(Specimen.isNotExhausted, 1) // Take the next 1 to include the Exhausted marker in the sequence.
+      .map((x) => Specimen.map(RoseTree.outcome, x))
       .take(count)
-      .takeWhile((x) => x !== undefined)
       .toGenerator();
-  };
 
   export const runAccepted = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Generator<T> => {
     return Random.run(seed, size, specimens)
+      .expand(applyExhaustionStrategy(exhaustsAfterConsecutiveSkips(10)))
+      .takeWhile(Specimen.isNotExhausted)
       .filter(Specimen.isAccepted)
       .map(RoseTree.outcome)
       .take(count)
-      .takeWhile((x) => x !== undefined)
       .toGenerator();
   };
 

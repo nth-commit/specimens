@@ -89,17 +89,26 @@ export class Sequence<T> {
     });
   }
 
-  takeWhile<U extends T>(pred: (value: T) => value is U): Sequence<U>;
-  takeWhile(pred: (value: T) => boolean): Sequence<T>;
-  takeWhile(pred: (x: T) => boolean): Sequence<T> {
+  takeWhile<U extends T>(pred: (value: T) => value is U, thenTake?: number): Sequence<U>;
+  takeWhile(pred: (value: T) => boolean, thenTake?: number): Sequence<T>;
+  takeWhile(pred: (x: T) => boolean, thenTake: number = 0): Sequence<T> {
     const generator = this.generatorFactory();
     return new Sequence(function* () {
-      for (const x of generator) {
-        if (pred(x)) {
-          yield x;
-        } else {
-          break;
+      let next = generator.next();
+
+      while (!next.done && pred(next.value)) {
+        yield next.value;
+        next = generator.next();
+      }
+
+      for (let i = 0; i < thenTake; i++) {
+        if (!next.done) {
+          yield next.value;
         }
+
+        try {
+          next = generator.next();
+        } catch {}
       }
     });
   }
@@ -118,7 +127,11 @@ export class Sequence<T> {
     const generator = this.generatorFactory();
     return new Sequence(function* () {
       for (let i = 0; i < count; i++) {
-        yield generator.next().value;
+        const next = generator.next();
+        if (next.done) {
+          break;
+        }
+        yield next.value;
       }
     });
   }

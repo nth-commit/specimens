@@ -3,6 +3,24 @@ import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
 
 const SIZE = 50;
 
+describe('Specimens.filter', () => {
+  test('Given an impossible predicate, sampling specimens exhausts', () => {
+    const specimens = Specimens.integer(IntegerRange.constant(0, 0));
+
+    const results = Array.from(specimens.filter(() => false).sample(SIZE, 100));
+
+    expect(results).toContain(Exhausted);
+  });
+
+  test('Given an impossible predicate, sampling accepted specimens returns empty', () => {
+    const specimens = Specimens.integer(IntegerRange.constant(0, 0));
+
+    const results = Array.from(specimens.filter(() => false).sampleAccepted(SIZE, 100));
+
+    expect(results).toEqual([]);
+  });
+});
+
 describe('Specimens.integer', () => {
   const range = IntegerRange.constant(0, 10);
 
@@ -52,7 +70,7 @@ describe('Specimens.integer', () => {
 });
 
 describe('Specimens.item', () => {
-  test('If given an empty array, it immediately exhausts', () => {
+  test('Given an empty array, it immediately exhausts', () => {
     const arr: unknown[] = [];
 
     const results = Specimens.item(arr).sample(10, 100);
@@ -60,7 +78,7 @@ describe('Specimens.item', () => {
     expect(Array.from(results)).toEqual([Exhausted]);
   });
 
-  test('If given a non-empty array, all specimens are accepted', () => {
+  test('Given a non-empty array, all specimens are accepted', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
     const results = Array.from(Specimens.item(arr).sample(SIZE, 100));
