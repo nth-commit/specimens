@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "es2020",
+      "module": "esnext",
+      "moduleResolution": "node",
+      "strict": true,
+      "noEmit": true,
+      "esModuleInterop": true,
+      "resolveJsonModule": true
+    },
+    "include": [
+      "src/**/*",
+      "test/**/*"
+    ]
+  }
