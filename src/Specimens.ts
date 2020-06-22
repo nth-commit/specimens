@@ -5,87 +5,37 @@ import Sequence from './Sequence';
 import Range, { Size, IntegerRange } from './Range';
 import Shrink from './Shrink';
 import Seed from './Seed';
+import Specimen, { Exhausted, Skipped } from './Specimen';
+import ExhaustionStrategy from './ExhaustionStrategy';
 
-export const Skipped = Symbol('Skipped');
-export const Exhausted = Symbol('Exhausted');
-export type Specimen<T> = RoseTree<T> | typeof Skipped | typeof Exhausted;
+const generatorForEach = <T>(generator: Generator<T>, action: (x: T) => void): void => {
+  while (true) {
+    const next = generator.next();
 
-export namespace Specimen {
-  export const isSkipped = <T>(x: T | typeof Skipped): x is typeof Skipped => x === Skipped;
-  export const isNotSkipped = <T>(x: T | typeof Skipped): x is T => !isSkipped(x);
+    if (next.done) {
+      return;
+    }
 
-  export const isExhausted = <T>(x: T | typeof Exhausted): x is typeof Exhausted => x === Exhausted;
-  export const isNotExhausted = <T>(x: T | typeof Exhausted): x is T => !isExhausted(x);
-
-  export const isAccepted = <T>(specimen: Specimen<T>): specimen is RoseTree<T> =>
-    isNotSkipped(specimen) && isNotExhausted(specimen);
-
-  export const map = <T, U>(f: (x: T) => U, specimen: Specimen<T>): Specimen<U> =>
-    isAccepted(specimen) ? RoseTree.map(f, specimen) : specimen;
-}
+    action(next.value);
+  }
+};
 
 export type Specimens<T> = Random<Specimen<T>>;
 
 namespace Specimens {
-  type SpecimenExhaustionStrategy = {
-    recognize: (s: Specimen<unknown>) => void;
-    isExhausted: () => boolean;
-  };
-
-  const applyExhaustionStrategy = <T>(exhaustionStrategy: SpecimenExhaustionStrategy) =>
-    function* (specimen: Specimen<T>) {
-      if (exhaustionStrategy.isExhausted()) {
-        throw 'Error: Attempted to take from exhausted specimens';
-      }
-
-      yield specimen;
-
-      exhaustionStrategy.recognize(specimen);
-      if (exhaustionStrategy.isExhausted()) {
-        yield Exhausted;
-      }
-    };
-
-  const exhaustsAfterConsecutiveSkips = (maxNumberOfSkips: number): SpecimenExhaustionStrategy => {
-    let skipCount = 0;
-
-    return {
-      recognize: (s) => {
-        if (Specimen.isSkipped(s)) {
-          skipCount++;
-        } else {
-          skipCount = 0;
-        }
-      },
-      isExhausted: () => skipCount >= maxNumberOfSkips,
-    };
-  };
-
-  const generatorForEach = <T>(generator: Generator<T>, action: (x: T) => void): void => {
-    while (true) {
-      const next = generator.next();
-
-      if (next.done) {
-        return;
-      }
-
-      action(next.value);
-    }
-  };
-
   export const singleton = <T>(x: Specimen<T>): Specimens<T> => () => Sequence.singleton(x);
 
-  export const acceptedSingleton = <T>(x: T): Specimens<T> => singleton(RoseTree.singleton(x));
+  export const constant = <T>(x: T): Specimens<T> => singleton(RoseTree.singleton(x));
 
   export const exhausted = <T>(): Specimens<T> => singleton(Exhausted);
-
-  export const constant = <T>(x: T): Specimens<T> => () => Sequence.infinite().map(() => RoseTree.singleton(x));
 
   export const bind = <T, U>(f: (x: T) => Specimens<U>, s: Specimens<T>): Specimens<U> =>
     Random.bind((x) => (Specimen.isAccepted(x) ? f(RoseTree.outcome(x)) : singleton(x)), s);
 
-  export const map = <T, U>(f: (x: T) => U, s: Specimens<T>): Specimens<U> =>
-    Random.map((x) => (Specimen.isAccepted(x) ? RoseTree.map(f, x) : x), s);
+  export const map = <T, U>(f: (x: T) => U, s: Specimens<T>): Specimens<U> => Random.map((x) => Specimen.map(f, x), s);
+
+  export const zip = <T1, T2>(s1: Specimens<T1>, s2: Specimens<T2>): Specimens<[T1, T2]> =>
+    bind((t1) => map((t2) => [t1, t2], s2), s1);
 
   // For each element in the sequence, yield infinitely until we find as many accepted outcomes that pass the
   // predicate. If the given specimens were already filtered through a hard predicate, this may spin for a
@@ -119,7 +69,7 @@ namespace Specimens {
   export const run = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Generator<Specimen<T>> => {
     const replications = Random.replicate(count, specimens);
     return Random.run(seed, size, replications)
-      .expand(applyExhaustionStrategy(exhaustsAfterConsecutiveSkips(10)))
+      .expand(ExhaustionStrategy.apply(ExhaustionStrategy.followingConsecutiveSkips(10)))
       .takeWhile(Specimen.isNotExhausted, 1) // Take the next 1 to include the Exhausted marker in the sequence.
       .take(count)
       .toGenerator();
@@ -128,7 +78,7 @@ namespace Specimens {
   export const runAccepted = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Generator<T> => {
     const replications = Random.replicate(count, specimens);
     return Random.run(seed, size, replications)
-      .expand(applyExhaustionStrategy(exhaustsAfterConsecutiveSkips(10)))
+      .expand(ExhaustionStrategy.apply(ExhaustionStrategy.followingConsecutiveSkips(10)))
       .takeWhile(Specimen.isNotExhausted)
       .filter(Specimen.isAccepted)
       .map(RoseTree.outcome)
@@ -148,7 +98,7 @@ namespace Specimens {
 }
 
 export class SpecimensBuilder<T> {
-  constructor(private specimens: Specimens<T>) {}
+  constructor(public specimens: Specimens<T>) {}
 
   public bind<U>(f: (x: T) => SpecimensBuilder<U>): SpecimensBuilder<U> {
     return new SpecimensBuilder(Specimens.bind((x) => f(x).specimens, this.specimens));
@@ -193,15 +143,14 @@ export class SpecimensBuilder<T> {
   }
 }
 
-export const singleton = <T>(x: T) => new SpecimensBuilder(Specimens.acceptedSingleton(x));
+export const constant = <T>(x: T) => new SpecimensBuilder(Specimens.constant(x));
 
 export const integer = (range: Range<number>): SpecimensBuilder<number> =>
   new SpecimensBuilder(Specimens.integer(range));
 
 export const item = <T>(arr: Array<T>): SpecimensBuilder<T> => new SpecimensBuilder(Specimens.item(arr));
 
-export const zip = <T1, T2>(s1: SpecimensBuilder<T1>, s2: SpecimensBuilder<T2>): SpecimensBuilder<[T1, T2]> => {
-  return s1.map((x) => [x, (0 as unknown) as T2]);
-};
+export const zip = <T1, T2>(s1: SpecimensBuilder<T1>, s2: SpecimensBuilder<T2>): SpecimensBuilder<[T1, T2]> =>
+  new SpecimensBuilder(Specimens.zip(s1.specimens, s2.specimens));
 
 // export const unfold = <T>(seed: T, unfolder: (prev: T) => Specimens<T> | undefined): SpecimensBuilder<T> => {};

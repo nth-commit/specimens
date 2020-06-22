@@ -1,5 +1,5 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
-import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
+import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
 
 const SIZE = 50;
 
