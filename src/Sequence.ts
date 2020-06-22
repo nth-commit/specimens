@@ -144,6 +144,14 @@ export class Sequence<T> {
     });
   }
 
+  append(s: Sequence<T>): Sequence<T> {
+    const generator = this.generatorFactory();
+    return new Sequence<T>(function* () {
+      yield* s;
+      yield* generator;
+    });
+  }
+
   concat(s: Sequence<T>): Sequence<T> {
     const generator = this.generatorFactory();
     return new Sequence<T>(function* () {

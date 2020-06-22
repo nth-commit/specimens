@@ -3,6 +3,7 @@ import { mersenne, uniformIntDistribution, RandomGenerator } from 'pure-rand';
 export type Seed = {
   nextInt(min: number, max: number): number;
   clone(): Seed;
+  split(): [Seed, Seed];
 };
 
 export namespace Seed {
@@ -18,6 +19,11 @@ export namespace Seed {
     return {
       nextInt: uniformInt,
       clone: () => create(r),
+      split: () => {
+        const [i, r2] = r.next();
+        const [j] = r2.next();
+        return [create(mersenne(i)), create(mersenne(j))];
+      },
     };
   };
 
