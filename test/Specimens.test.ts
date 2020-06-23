@@ -83,15 +83,15 @@ describe('Specimens.integer', () => {
   });
 
   test('Specimens are evenly distributed', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 1000));
+    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 2000));
 
     expect(mean(results)).toBeGreaterThan(4.75);
     expect(mean(results)).toBeLessThan(5.25);
-    expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
+    expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.11);
   });
 
   test('Specimens occupy the range', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 1000));
+    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 2000));
 
     const [expectedMin, expectedMax] = IntegerRange.bounds(SIZE, range);
     expect(min(results)).toEqual(expectedMin);
@@ -101,7 +101,7 @@ describe('Specimens.integer', () => {
   test('Specimens are repeatable', () => {
     const seed = Seed.spawn();
 
-    const sample = () => Array.from(Specimens.integer(range).runAccepted(seed, SIZE, 1000));
+    const sample = () => Array.from(Specimens.integer(range).runAccepted(seed, SIZE, 100));
 
     expect(sample()).toEqual(sample());
   });
@@ -111,9 +111,9 @@ describe('Specimens.item', () => {
   test('Given an empty array, it immediately exhausts', () => {
     const arr: unknown[] = [];
 
-    const results = Specimens.item(arr).sample(10, 100);
+    const results = Array.from(Specimens.item(arr).sample(10, 100));
 
-    expect(Array.from(results)).toEqual([Exhausted]);
+    expect(results).toEqual([Exhausted]);
   });
 
   test('Given a non-empty array, all specimens are accepted', () => {
@@ -135,7 +135,7 @@ describe('Specimens.item', () => {
   test('Specimens are evenly distributed', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 1000));
+    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 2000));
 
     expect(mean(results)).toBeGreaterThan(4.75);
     expect(mean(results)).toBeLessThan(5.25);
@@ -145,7 +145,7 @@ describe('Specimens.item', () => {
   test('Specimens occupy the range', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 1000));
+    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 2000));
 
     expect(min(results)).toEqual(min(arr));
     expect(max(results)).toEqual(max(arr));

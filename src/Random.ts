@@ -49,7 +49,7 @@ export namespace Random {
     let nextSeed = makeNextSeed(seed);
 
     for (let i = 0; i < n; i++) {
-      results = results.append(run(nextSeed(), size, r));
+      results = Sequence.concat(results, run(nextSeed(), size, r));
     }
 
     return results;

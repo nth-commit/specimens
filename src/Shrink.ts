@@ -1,4 +1,4 @@
-import Sequence, { Unfolded } from './Sequence';
+import Sequence from './Sequence';
 import Numeric from './Numeric';
 
 export type Shrinker<T> = (x: T) => Sequence<T>;
@@ -7,13 +7,13 @@ export namespace Shrink {
   const takeHalves = <N>(numeric: Numeric<N>, from: N): Sequence<N> =>
     Sequence.unfold((previous) => {
       if (numeric.eq(previous, numeric.ZERO)) {
-        return Unfolded;
+        return undefined;
       }
 
       const two = numeric.add(numeric.ONE, numeric.ONE);
       const next = numeric.div(previous, two);
       if (numeric.eq(previous, next)) {
-        return Unfolded;
+        return undefined;
       }
 
       return next;
@@ -31,7 +31,7 @@ export namespace Shrink {
 
     const differenceFromDestination = numeric.sub(x, destination);
     const halves = takeHalves(numeric, differenceFromDestination).map((h) => numeric.add(h, destination));
-    return Sequence.singleton(destination).concat(halves);
+    return Sequence.concat(Sequence.singleton(destination), halves);
   };
 }
 

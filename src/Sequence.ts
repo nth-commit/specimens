@@ -1,175 +1,121 @@
-export const Unfolded = Symbol();
+import { IterableX, generate, from, of, empty, concat, toArray } from 'ix/iterable';
+import { skip, take, map, filter, flatMap, takeWhile } from 'ix/iterable/operators';
+import { OperatorFunction } from 'ix/interfaces';
 
-export class Sequence<T> {
-  static terminated = <U>(): Sequence<U> =>
-    new Sequence<U>(function* () {
-      return;
-    });
+export class TakeWhileInclusiveIterable<TSource> extends IterableX<TSource> {
+  private _source: Iterable<TSource>;
+  private _predicate: (value: TSource, index: number) => boolean;
 
-  static infinite = (): Sequence<BigInt> =>
-    new Sequence(function* () {
-      let count = 0n;
-      while (true) {
-        yield count++;
+  constructor(source: Iterable<TSource>, predicate: (value: TSource, index: number) => boolean) {
+    super();
+    this._source = source;
+    this._predicate = predicate;
+  }
+
+  *[Symbol.iterator]() {
+    let i = 0;
+    for (const item of this._source) {
+      yield item;
+      if (!this._predicate(item, i++)) {
+        break;
       }
-    });
+    }
+  }
+}
 
-  static from = <U>(arr: Array<U>): Sequence<U> => {
-    return new Sequence(function* () {
-      yield* arr;
-    });
+export function takeWhileInclusive<T, S extends T>(
+  predicate: (value: T, index: number) => value is S,
+): OperatorFunction<T, S>;
+export function takeWhileInclusive<T>(predicate: (value: T, index: number) => boolean): OperatorFunction<T, T>;
+export function takeWhileInclusive<T>(predicate: (value: T, index: number) => boolean): OperatorFunction<T, T> {
+  return function takeWhileInclusiveOperatorFunction(source: Iterable<T>): IterableX<T> {
+    return new TakeWhileInclusiveIterable<T>(source, predicate);
   };
+}
 
-  static singleton = <U>(x: U): Sequence<U> =>
-    new Sequence<U>(function* () {
-      yield x;
-    });
+export class Sequence<T> implements Iterable<T> {
+  static infinite(): Sequence<bigint> {
+    return new Sequence(
+      generate(
+        0n,
+        () => true,
+        (n) => n + 1n,
+        (n) => n,
+      ),
+    );
+  }
 
-  static empty = <U>(): Sequence<U> =>
-    new Sequence<U>(function* () {
-      yield* [];
-    });
+  static from<U>(source: Iterable<U> | Iterator<U> | ArrayLike<U>): Sequence<U> {
+    return new Sequence(from(source));
+  }
 
-  static unfold = <U>(unfolder: (x: U) => U | typeof Unfolded, seed: U): Sequence<U> =>
-    new Sequence<U>(function* () {
-      let current: U | typeof Unfolded = seed;
-      while (current !== Unfolded) {
-        yield current;
-        current = unfolder(current);
-      }
-    });
+  static singleton<U>(x: U): Sequence<U> {
+    return new Sequence(of(x));
+  }
+
+  static empty<U>(): Sequence<U> {
+    return new Sequence(empty());
+  }
+
+  static concat<U>(s1: Sequence<U>, s2: Sequence<U>): Sequence<U> {
+    return new Sequence(concat(s1, s2));
+  }
+
+  static unfold<U>(unfolder: (x: U) => U | undefined, seed: U): Sequence<U> {
+    return new Sequence(
+      generate(
+        seed,
+        (x) => x !== undefined,
+        (x) => unfolder(x) as U,
+        (x) => x,
+      ),
+    );
+  }
 
   [Symbol.iterator]() {
-    return this.generatorFactory();
+    return this.iterable[Symbol.iterator]();
   }
 
-  constructor(private generatorFactory: () => Generator<T>) {}
+  constructor(private iterable: IterableX<T>) {}
+
+  skip(n: number): Sequence<T> {
+    return new Sequence<T>(this.iterable.pipe(skip(n)));
+  }
+
+  take(n: number): Sequence<T> {
+    return new Sequence<T>(this.iterable.pipe(take(n)));
+  }
+
+  takeWhile<U extends T>(pred: (value: T) => value is U): Sequence<U>;
+  takeWhile(pred: (value: T) => boolean): Sequence<T>;
+  takeWhile(pred: (x: T) => boolean): Sequence<T> {
+    return new Sequence<T>(this.iterable.pipe(takeWhile(pred)));
+  }
+
+  takeWhileInclusive(pred: (x: T) => boolean): Sequence<T> {
+    return new Sequence<T>(this.iterable.pipe(takeWhileInclusive(pred)));
+  }
 
   map<U>(f: (x: T) => U): Sequence<U> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (const x of generator) {
-        yield f(x);
-      }
-    });
+    return new Sequence<U>(this.iterable.pipe(map(f)));
   }
 
-  bind<U>(f: (x: T) => Sequence<U>): Sequence<U> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (const x of generator) {
-        for (const y of f(x)) {
-          yield y;
-        }
-      }
-    });
+  bind<U>(f: (x: T) => Sequence<U>) {
+    return new Sequence<U>(this.iterable.pipe(flatMap(f)));
   }
 
-  expand<U>(f: (x: T) => Generator<U>): Sequence<U> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (const x of generator) {
-        for (const y of f(x)) {
-          yield y;
-        }
-      }
-    });
+  expand<U>(f: (x: T) => Generator<U>) {
+    return this.bind((x) => Sequence.from(f(x)));
   }
 
   filter<U extends T>(pred: (value: T) => value is U): Sequence<U>;
   filter(pred: (value: T) => boolean): Sequence<T>;
   filter(pred: (x: T) => boolean): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (const x of generator) {
-        if (pred(x)) {
-          yield x;
-        }
-      }
-    });
-  }
-
-  takeWhile<U extends T>(pred: (value: T) => value is U, thenTake?: number): Sequence<U>;
-  takeWhile(pred: (value: T) => boolean, thenTake?: number): Sequence<T>;
-  takeWhile(pred: (x: T) => boolean, thenTake: number = 0): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      let next = generator.next();
-
-      while (!next.done && pred(next.value)) {
-        yield next.value;
-        next = generator.next();
-      }
-
-      for (let i = 0; i < thenTake; i++) {
-        if (!next.done) {
-          yield next.value;
-        }
-
-        try {
-          next = generator.next();
-        } catch {}
-      }
-    });
-  }
-
-  skip(count: number): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (let i = 0; i < count; i++) {
-        generator.next();
-      }
-      yield* generator;
-    });
-  }
-
-  take(count: number): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence(function* () {
-      for (let i = 0; i < count; i++) {
-        const next = generator.next();
-        if (next.done) {
-          break;
-        }
-        yield next.value;
-      }
-    });
-  }
-
-  cons(head: T): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence<T>(function* () {
-      yield head;
-      yield* generator;
-    });
-  }
-
-  append(s: Sequence<T>): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence<T>(function* () {
-      yield* s;
-      yield* generator;
-    });
-  }
-
-  concat(s: Sequence<T>): Sequence<T> {
-    const generator = this.generatorFactory();
-    return new Sequence<T>(function* () {
-      yield* generator;
-      yield* s;
-    });
-  }
-
-  isEmpty(): boolean {
-    return this.generatorFactory().next().done === true;
+    return new Sequence(this.iterable.pipe(filter(pred)));
   }
 
   toArray(): Array<T> {
-    return Array.from(this.generatorFactory());
-  }
-
-  toGenerator(): Generator<T> {
-    return this.generatorFactory();
+    return toArray(this.iterable);
   }
 }
 

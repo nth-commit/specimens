@@ -15,14 +15,6 @@ export namespace RoseTree {
     const filteredShrinks = shrinks.bind((tree) => filter(pred, tree));
     return pred(outcome) ? Sequence.singleton([outcome, filteredShrinks]) : filteredShrinks;
   };
-
-  export const expand = <T, U>(fs: Array<(x: T) => U>, tree: RoseTree<T>): Sequence<RoseTree<U>> => {
-    return new Sequence(function* () {
-      for (const f of fs) {
-        yield map(f, tree);
-      }
-    });
-  };
 }
 
 export default RoseTree;

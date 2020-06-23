@@ -14,6 +14,9 @@ export namespace Specimen {
   export const isAccepted = <T>(specimen: Specimen<T>): specimen is RoseTree<T> =>
     isNotSkipped(specimen) && isNotExhausted(specimen);
 
+  export const isDiscarded = <T>(specimen: Specimen<T>): specimen is typeof Skipped | typeof Exhausted =>
+    !isAccepted(specimen);
+
   export const discarded = <T>(x: typeof Skipped | typeof Exhausted): Specimen<T> => x;
 
   export const mapTree = <T, U>(f: (x: RoseTree<T>) => RoseTree<U>, specimen: Specimen<T>): Specimen<U> =>
