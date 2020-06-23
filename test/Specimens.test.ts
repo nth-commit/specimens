@@ -83,15 +83,16 @@ describe('Specimens.integer', () => {
   });
 
   test('Specimens are evenly distributed', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 2000));
+    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
 
     expect(mean(results)).toBeGreaterThan(4.75);
+    ``;
     expect(mean(results)).toBeLessThan(5.25);
-    expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.11);
+    expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
 
   test('Specimens occupy the range', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 2000));
+    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
 
     const [expectedMin, expectedMax] = IntegerRange.bounds(SIZE, range);
     expect(min(results)).toEqual(expectedMin);
@@ -135,7 +136,7 @@ describe('Specimens.item', () => {
   test('Specimens are evenly distributed', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 2000));
+    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
 
     expect(mean(results)).toBeGreaterThan(4.75);
     expect(mean(results)).toBeLessThan(5.25);
@@ -145,7 +146,7 @@ describe('Specimens.item', () => {
   test('Specimens occupy the range', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 2000));
+    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
 
     expect(min(results)).toEqual(min(arr));
     expect(max(results)).toEqual(max(arr));

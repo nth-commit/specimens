@@ -45,14 +45,10 @@ export namespace Random {
   };
 
   export const replicate = <T>(n: number, r: Random<T>): Random<T> => (seed, size) => {
-    let results = Sequence.empty<T>();
     let nextSeed = makeNextSeed(seed);
-
-    for (let i = 0; i < n; i++) {
-      results = Sequence.concat(results, run(nextSeed(), size, r));
-    }
-
-    return results;
+    return Sequence.infinite()
+      .take(n)
+      .bind(() => run(nextSeed(), size, r));
   };
 
   export const replicateInfinite = <T>(r: Random<T>): Random<T> => (seed, size) => {

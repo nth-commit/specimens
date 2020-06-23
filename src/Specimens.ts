@@ -28,22 +28,22 @@ namespace Specimens {
   const applyFilter = <T>(pred: (x: T) => boolean) => (specimen: Specimen<T>): Specimen<T> =>
     Specimen.isAccepted(specimen) && !pred(RoseTree.outcome(specimen)) ? Skipped : specimen;
 
-  // For each element in the sequence, yield infinitely until we find as many accepted outcomes that pass the
-  // predicate. If the given specimens were already filtered through a hard predicate, this may spin for a
-  // loooooooong time - but it's up to the enumerating code to control excessive rejections.
   export const filter = <T>(pred: (x: T) => boolean, specimens: Specimens<T>): Specimens<T> =>
-    Random.expand(function* (seed, size, x) {
-      if (Specimen.isDiscarded(x)) {
-        // Specimen was already filtered
-        yield x;
+    Random.expand(function* (seed, size, specimen) {
+      if (Specimen.isDiscarded(specimen)) {
+        // Specimen was discarded in a previous filter
+        yield specimen;
+        return;
       }
 
-      const sequenceOfCurrent = Sequence.singleton(x);
-      const infiniteSequenceOfNext = Random.run(seed, size, Random.replicateInfinite(specimens));
+      // Starting with the current, create an infinite sequence of specimens so we can do our best to find one that
+      // passes the predicate.
+      const specimensReplicatedIndefinitely = Sequence.concat(
+        Sequence.singleton(specimen),
+        Random.run(seed, size, Random.replicateInfinite(specimens)),
+      );
 
-      yield* Sequence.concat(sequenceOfCurrent, infiniteSequenceOfNext)
-        .map(applyFilter(pred))
-        .takeWhileInclusive(Specimen.isDiscarded);
+      yield* specimensReplicatedIndefinitely.map(applyFilter(pred)).takeWhileInclusive(Specimen.isDiscarded);
     }, specimens);
 
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> => {
