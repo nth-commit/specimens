@@ -7,7 +7,7 @@ export type Seed = {
 };
 
 export namespace Seed {
-  const create = (r0: RandomGenerator): Seed => {
+  const makeSeed = (r0: RandomGenerator): Seed => {
     let r = r0;
 
     let uniformInt = (min: number, max: number): number => {
@@ -18,16 +18,18 @@ export namespace Seed {
 
     return {
       nextInt: uniformInt,
-      clone: () => create(r),
+      clone: () => makeSeed(r),
       split: () => {
         const [i, r2] = r.next();
         const [j] = r2.next();
-        return [create(mersenne(i)), create(mersenne(j))];
+        return [makeSeed(mersenne(i)), makeSeed(mersenne(j))];
       },
     };
   };
 
-  export const spawn = (): Seed => create(mersenne(new Date().getTime()));
+  export const create = (seed: number): Seed => makeSeed(mersenne(seed));
+
+  export const spawn = (): Seed => create(new Date().getTime());
 }
 
 export default Seed;

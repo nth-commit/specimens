@@ -1,5 +1,5 @@
 import { IterableX, generate, from, of, empty, concat, toArray } from 'ix/iterable';
-import { skip, take, map, filter, flatMap, takeWhile } from 'ix/iterable/operators';
+import { skip, take, map, filter, flatMap, takeWhile, takeLast } from 'ix/iterable/operators';
 import { OperatorFunction } from 'ix/interfaces';
 
 export class TakeWhileInclusiveIterable<TSource> extends IterableX<TSource> {
@@ -84,6 +84,16 @@ export class Sequence<T> implements Iterable<T> {
 
   take(n: number): Sequence<T> {
     return new Sequence<T>(this.iterable.pipe(take(n)));
+  }
+
+  takeLast(n: number): Sequence<T> {
+    return new Sequence<T>(this.iterable.pipe(takeLast(n)));
+  }
+
+  last(): T | undefined {
+    for (const x of this.takeLast(1)) {
+      return x;
+    }
   }
 
   takeWhile<U extends T>(pred: (value: T) => value is U): Sequence<U>;

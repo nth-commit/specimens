@@ -17,18 +17,18 @@ export namespace Random {
 
   export const run = <T>(seed: Seed, size: Size, r: Random<T>): Sequence<T> => r(seed, size);
 
-  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Random<N> => (seed, size) => {
-    const [min, max] = range.getSizedBounds(size);
-    const seedPrime = seed.clone();
-    return Sequence.infinite().map(() => numeric.random(seedPrime, min, max));
-  };
-
   export const map = <T, U>(f: (x: T) => U, r: Random<T>): Random<U> => (seed, size) => r(seed, size).map(f);
+
+  export const bind = <T, U>(f: (x: T) => Random<U>, r: Random<T>): Random<U> => (seed, size) => {
+    const nextSeed = makeNextSeed(seed);
+    const sequence = Random.run(nextSeed(), size, r);
+    return sequence.bind((x) => Random.run(nextSeed(), size, f(x)));
+  };
 
   export const mapSequence = <T, U>(f: (x: Sequence<T>) => Sequence<U>, r: Random<T>): Random<U> => (seed, size) =>
     f(r(seed, size));
 
-  export const expand = <T, U>(f: (seed: Seed, size: Size, x: T) => Generator<U, void>, r: Random<T>): Random<U> => (
+  export const spread = <T, U>(f: (seed: Seed, size: Size, x: T) => Generator<U, void>, r: Random<T>): Random<U> => (
     seed,
     size,
   ) => {
@@ -38,22 +38,14 @@ export namespace Random {
     });
   };
 
-  export const bind = <T, U>(f: (x: T) => Random<U>, r: Random<T>): Random<U> => (seed, size) => {
-    const [s1, s2] = seed.split();
-    const sequence = Random.run(s1, size, r);
-    return sequence.bind((x) => Random.run(s2, size, f(x)));
+  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Random<N> => (seed, size) => {
+    const [min, max] = range.getSizedBounds(size);
+    return Sequence.infinite().map(() => numeric.random(seed, min, max));
   };
 
-  export const replicate = <T>(n: number, r: Random<T>): Random<T> => (seed, size) => {
+  export const repeat = <T>(r: Random<T>): Random<T> => (seed, size) => {
     let nextSeed = makeNextSeed(seed);
-    return Sequence.infinite()
-      .take(n)
-      .bind(() => run(nextSeed(), size, r));
-  };
-
-  export const replicateInfinite = <T>(r: Random<T>): Random<T> => (seed, size) => {
-    const nextSeed = makeNextSeed(seed);
-    return Sequence.infinite().bind(() => Random.run(nextSeed(), size, r));
+    return Sequence.infinite().bind(() => run(nextSeed(), size, r));
   };
 }
 

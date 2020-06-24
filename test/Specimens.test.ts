@@ -1,5 +1,5 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
-import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
+import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
 
 const SIZE = 50;
 
@@ -26,6 +26,26 @@ describe('Specimens.filter', () => {
     const results = Array.from(specimens.sampleAccepted(SIZE, 100));
 
     expect(results).toEqual([]);
+  });
+
+  test.skip('It is composable', () => {
+    const predicateA = (n: number): boolean => n % 2 === 0;
+    const predicateB = (n: number): boolean => n % 3 === 0;
+    const baseSpecimens = Specimens.integer(IntegerRange.constant(0, 6));
+
+    const seed = Seed.create(1);
+    const sample = (specimans: SpecimensBuilder<number>) => Array.from(specimans.runAccepted(seed.clone(), 50, 10));
+
+    const singleFilteredSpecimens = sample(baseSpecimens.filter((n) => predicateA(n) && predicateB(n)));
+    const singleFilteredSpecimens2 = sample(baseSpecimens.filter((n) => predicateA(n) && predicateB(n)));
+    const composeFilteredSpecimens = sample(baseSpecimens.filter(predicateA).filter(predicateB));
+    const composeFilteredSpecimens2 = sample(baseSpecimens.filter(predicateA).filter(predicateB));
+
+    console.log(singleFilteredSpecimens);
+    console.log(singleFilteredSpecimens2);
+    console.log(composeFilteredSpecimens);
+    console.log(composeFilteredSpecimens2);
+    expect(singleFilteredSpecimens).toEqual(composeFilteredSpecimens);
   });
 });
 
@@ -86,7 +106,6 @@ describe('Specimens.integer', () => {
     const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
 
     expect(mean(results)).toBeGreaterThan(4.75);
-    ``;
     expect(mean(results)).toBeLessThan(5.25);
     expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
