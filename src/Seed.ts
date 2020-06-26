@@ -9,8 +9,8 @@ export namespace Seed {
   const makeSeed = (r0: RandomGenerator): Seed => ({
     nextInt: (min: number, max: number): number => uniformIntDistribution(min, max, r0)[0],
     split: () => {
-      const [i, r2] = r0.next();
-      const [j] = r2.next();
+      const [i, r1] = r0.next();
+      const [j] = r1.next();
       return [makeSeed(mersenne(i)), makeSeed(mersenne(j))];
     },
   });

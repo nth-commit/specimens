@@ -49,6 +49,14 @@ export class Sequence<T> implements Iterable<T> {
     return new Sequence(from(source));
   }
 
+  static of<U>(x: U): Sequence<U> {
+    return Sequence.from([x]);
+  }
+
+  static fromGenerator<U>(source: () => Generator<U>): Sequence<U> {
+    return new Sequence(from(source()));
+  }
+
   static singleton<U>(x: U): Sequence<U> {
     return new Sequence(of(x));
   }
@@ -126,6 +134,16 @@ export class Sequence<T> implements Iterable<T> {
 
   toArray(): Array<T> {
     return toArray(this.iterable);
+  }
+
+  tap(f: (x: T) => void): Sequence<T> {
+    const iterable = this.iterable;
+    return Sequence.fromGenerator(function* () {
+      for (const x of iterable) {
+        f(x);
+        yield x;
+      }
+    });
   }
 }
 

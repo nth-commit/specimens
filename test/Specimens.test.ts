@@ -68,7 +68,7 @@ describe('Specimens.zip', () => {
     results.forEach((x) => expect(Specimen.isAccepted(x)).toEqual(true));
   });
 
-  test.skip('All specimens are a product of their elements', () => {
+  test('All specimens are a product of their elements', () => {
     const results = Array.from(Specimens.zip(specimens1, specimens2).sampleAccepted(SIZE, 100));
 
     results.forEach(([r1, r2]) => {
@@ -111,8 +111,8 @@ describe('Specimens.integer', () => {
   test('Specimens are evenly distributed', () => {
     const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
 
-    expect(mean(results)).toBeGreaterThan(4.75);
-    expect(mean(results)).toBeLessThan(5.25);
+    expect(mean(results)).toBeGreaterThan(4.95);
+    expect(mean(results)).toBeLessThan(5.05);
     expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
 
@@ -163,8 +163,8 @@ describe('Specimens.item', () => {
 
     const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
 
-    expect(mean(results)).toBeGreaterThan(4.75);
-    expect(mean(results)).toBeLessThan(5.25);
+    expect(mean(results)).toBeGreaterThan(4.95);
+    expect(mean(results)).toBeLessThan(5.05);
     expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
 
