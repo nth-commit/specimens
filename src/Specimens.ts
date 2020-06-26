@@ -31,7 +31,7 @@ namespace Specimens {
 
   export const filter = <T>(pred: (x: T) => boolean, specimens: Specimens<T>): Specimens<T> =>
     Random.spread(function* (seed, size, specimen) {
-      if (Specimen.isDiscarded(specimen)) {
+      if (Specimen.isAccepted(specimen) === false) {
         // Specimen was discarded in a previous filter
         yield specimen;
         return;

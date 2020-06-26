@@ -1,5 +1,3 @@
-import RoseTree from './RoseTree';
-
 export const Skipped = Symbol('Skipped');
 export const Exhausted = Symbol('Exhausted');
 export type Specimen<T> = T | typeof Skipped | typeof Exhausted;
@@ -16,8 +14,6 @@ export namespace Specimen {
 
   export const isDiscarded = <T>(specimen: Specimen<T>): specimen is typeof Skipped | typeof Exhausted =>
     !isAccepted(specimen);
-
-  export const discarded = <T>(x: typeof Skipped | typeof Exhausted): Specimen<T> => x;
 
   export const map = <T, U>(f: (x: T) => U, specimen: Specimen<T>): Specimen<U> =>
     isAccepted(specimen) ? f(specimen) : specimen;

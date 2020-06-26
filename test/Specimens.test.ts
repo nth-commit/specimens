@@ -1,12 +1,16 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
-import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
+import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
 
 const SIZE = 50;
+
+const setDifference = <T>(a: Set<T>, b: Set<T>): Set<T> => {
+  return new Set([...a].filter((x) => !b.has(x)));
+};
 
 test('Specimens.map', () => {
   const specimens = Specimens.integer(IntegerRange.constant(0, 0)).map((x) => x + 1);
 
-  const results = Array.from(specimens.sampleAccepted(SIZE, 100));
+  const results = new Set(specimens.sampleAccepted(SIZE, 100));
 
   results.forEach((x) => expect(x).toStrictEqual(1));
 });
@@ -15,7 +19,7 @@ describe('Specimens.filter', () => {
   test('Given an impossible predicate, sampling specimens exhausts', () => {
     const specimens = Specimens.integer(IntegerRange.constant(0, 0)).filter(() => false);
 
-    const results = Array.from(specimens.sample(SIZE, 100));
+    const results = new Set(specimens.sample(SIZE, 100));
 
     expect(results).toContain(Exhausted);
   });
@@ -23,29 +27,31 @@ describe('Specimens.filter', () => {
   test('Given an impossible predicate, sampling accepted specimens returns empty', () => {
     const specimens = Specimens.integer(IntegerRange.constant(0, 0)).filter(() => false);
 
-    const results = Array.from(specimens.sampleAccepted(SIZE, 100));
+    const results = new Set(specimens.sampleAccepted(SIZE, 100));
 
-    expect(results).toEqual([]);
+    expect(results.size).toEqual(0);
   });
 
-  test.skip('It is composable', () => {
-    const predicateA = (n: number): boolean => n % 2 === 0;
-    const predicateB = (n: number): boolean => n % 3 === 0;
-    const baseSpecimens = Specimens.integer(IntegerRange.constant(0, 6));
+  test('Accepted specimens pass the predicate', () => {
+    const predicate = (x: number): boolean => x % 2 === 0;
+    const filteredSpecimens = Specimens.integer(IntegerRange.constant(0, 10)).filter(predicate);
 
-    const seed = Seed.create(1);
-    const sample = (specimans: SpecimensBuilder<number>) => Array.from(specimans.runAccepted(seed.clone(), 50, 10));
+    const passingResults = new Set(filteredSpecimens.sampleAccepted(SIZE, 100));
 
-    const singleFilteredSpecimens = sample(baseSpecimens.filter((n) => predicateA(n) && predicateB(n)));
-    const singleFilteredSpecimens2 = sample(baseSpecimens.filter((n) => predicateA(n) && predicateB(n)));
-    const composeFilteredSpecimens = sample(baseSpecimens.filter(predicateA).filter(predicateB));
-    const composeFilteredSpecimens2 = sample(baseSpecimens.filter(predicateA).filter(predicateB));
+    passingResults.forEach((x) => expect(predicate(x)).toStrictEqual(true));
+  });
 
-    console.log(singleFilteredSpecimens);
-    console.log(singleFilteredSpecimens2);
-    console.log(composeFilteredSpecimens);
-    console.log(composeFilteredSpecimens2);
-    expect(singleFilteredSpecimens).toEqual(composeFilteredSpecimens);
+  test('Skipped specimens fail the predicate', () => {
+    const predicate = (x: number): boolean => x % 2 === 0;
+    const unfilteredSpecimens = Specimens.integer(IntegerRange.constant(0, 10));
+    const filteredSpecimens = unfilteredSpecimens.filter(predicate);
+
+    const failingResults = setDifference(
+      new Set(unfilteredSpecimens.sampleAccepted(SIZE, 100)),
+      new Set(filteredSpecimens.sampleAccepted(SIZE, 100)),
+    );
+
+    failingResults.forEach((x) => expect(predicate(x)).toStrictEqual(false));
   });
 });
 
