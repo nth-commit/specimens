@@ -56,7 +56,7 @@ namespace Specimens {
     }, specimens);
 
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> => {
-    const r: Random<N> = Random.integral(numeric, range);
+    const r = Random.integral(numeric, range);
     const shrink = Shrink.towards(numeric, range.origin);
     const f = (x: N): RoseTree<N> => [x, shrink(x).map(RoseTree.singleton)];
     return Random.map<N, Specimen<RoseTree<N>>>(f, r);
@@ -148,3 +148,5 @@ export const item = <T>(arr: Array<T>): SpecimensBuilder<T> => new SpecimensBuil
 
 export const zip = <T1, T2>(s1: SpecimensBuilder<T1>, s2: SpecimensBuilder<T2>): SpecimensBuilder<[T1, T2]> =>
   new SpecimensBuilder(Specimens.zip(s1.specimens, s2.specimens));
+
+export const exhausted = <T>(): SpecimensBuilder<T> => new SpecimensBuilder(Specimens.exhausted());

@@ -56,30 +56,42 @@ describe('Specimens.filter', () => {
 });
 
 describe('Specimens.zip', () => {
-  const range1 = IntegerRange.constant(1, 10);
-  const specimens1 = Specimens.integer(range1);
+  test('It has equivalency with its left component', () => {
+    const seed = Seed.spawn();
+    const specimensLeft = Specimens.integer(IntegerRange.constant(1, 10));
+    const specimensZipped = Specimens.zip(specimensLeft, Specimens.constant(0));
 
-  const range2 = IntegerRange.constant(11, 20);
-  const specimens2 = Specimens.integer(range2);
+    const zippedResults = Array.from(specimensZipped.runAccepted(seed, SIZE, 10));
+    const leftResults = Array.from(specimensLeft.runAccepted(seed, SIZE, 10));
 
-  test('Given all element specimens are accepted, result specimens are accepted', () => {
-    const results = Array.from(Specimens.zip(specimens1, specimens2).sample(SIZE, 100));
-
-    results.forEach((x) => expect(Specimen.isAccepted(x)).toEqual(true));
+    expect(zippedResults.map(([left]) => left)).toEqual(leftResults);
   });
 
-  test('All specimens are a product of their elements', () => {
-    const results = Array.from(Specimens.zip(specimens1, specimens2).sampleAccepted(SIZE, 100));
+  test('It has equivalency with its right component', () => {
+    const seed = Seed.spawn();
+    const specimensRight = Specimens.integer(IntegerRange.constant(1, 10));
+    const specimensZipped = Specimens.zip(Specimens.constant(0), specimensRight);
 
-    results.forEach(([r1, r2]) => {
-      const [min1, max1] = IntegerRange.bounds(SIZE, range1);
-      expect(r1).toBeLessThanOrEqual(max1);
-      expect(r1).toBeGreaterThanOrEqual(min1);
+    const zippedResults = Array.from(specimensZipped.runAccepted(seed, SIZE, 10));
+    const rightResults = Array.from(specimensRight.runAccepted(seed, SIZE, 10));
 
-      const [min2, max2] = IntegerRange.bounds(SIZE, range2);
-      expect(r2).toBeLessThanOrEqual(max2);
-      expect(r2).toBeGreaterThanOrEqual(min2);
-    });
+    expect(zippedResults.map(([, right]) => right)).toEqual(rightResults);
+  });
+
+  test('It is exhausted if its left component is exhausted', () => {
+    const specimens = Specimens.zip(Specimens.exhausted(), Specimens.constant(0));
+
+    const results = Array.from(specimens.sample(SIZE, 1));
+
+    expect(results).toEqual([Exhausted]);
+  });
+
+  test('It is exhausted if its right component is exhausted', () => {
+    const specimens = Specimens.zip(Specimens.constant(0), Specimens.exhausted());
+
+    const results = Array.from(specimens.sample(SIZE, 1));
+
+    expect(results).toEqual([Exhausted]);
   });
 });
 
@@ -111,8 +123,8 @@ describe('Specimens.integer', () => {
   test('Specimens are evenly distributed', () => {
     const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
 
-    expect(mean(results)).toBeGreaterThan(4.95);
-    expect(mean(results)).toBeLessThan(5.05);
+    expect(mean(results)).toBeGreaterThan(4.9);
+    expect(mean(results)).toBeLessThan(5.1);
     expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
 
@@ -163,8 +175,8 @@ describe('Specimens.item', () => {
 
     const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
 
-    expect(mean(results)).toBeGreaterThan(4.95);
-    expect(mean(results)).toBeLessThan(5.05);
+    expect(mean(results)).toBeGreaterThan(4.9);
+    expect(mean(results)).toBeLessThan(5.1);
     expect(Math.abs(sampleSkewness(results))).toBeLessThan(0.1);
   });
 
