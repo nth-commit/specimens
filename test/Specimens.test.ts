@@ -1,5 +1,5 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
-import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
+import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
 
 const SIZE = 50;
 
@@ -16,20 +16,12 @@ test('Specimens.map', () => {
 });
 
 describe('Specimens.filter', () => {
-  test('Given an impossible predicate, sampling specimens exhausts', () => {
+  test('It exhausts with an impossible predicate', () => {
     const specimens = Specimens.integer(IntegerRange.constant(0, 0)).filter(() => false);
 
     const results = new Set(specimens.sample(SIZE, 100));
 
     expect(results).toContain(Exhausted);
-  });
-
-  test('Given an impossible predicate, sampling accepted specimens returns empty', () => {
-    const specimens = Specimens.integer(IntegerRange.constant(0, 0)).filter(() => false);
-
-    const results = new Set(specimens.sampleAccepted(SIZE, 100));
-
-    expect(results.size).toEqual(0);
   });
 
   test('Accepted specimens pass the predicate', () => {
@@ -52,6 +44,34 @@ describe('Specimens.filter', () => {
     );
 
     failingResults.forEach((x) => expect(predicate(x)).toStrictEqual(false));
+  });
+
+  test('It is composable', () => {
+    const predicateA = (x: number): boolean => x % 2 === 0;
+    const predicateB = (x: number): boolean => x % 3 === 0;
+    const specimens = Specimens.integer(IntegerRange.constant(1, 6));
+
+    const seed = Seed.create(0);
+    const run = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+      Array.from(specimens.run(seed, SIZE, 10));
+
+    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
+      run(specimens.filter((x) => predicateA(x) && predicateB(x))),
+    );
+  });
+
+  test('It is commutative', () => {
+    const predicateA = (x: number): boolean => x % 2 === 0;
+    const predicateB = (x: number): boolean => x % 3 === 0;
+    const specimens = Specimens.integer(IntegerRange.constant(1, 6));
+
+    const seed = Seed.create(0);
+    const run = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+      Array.from(specimens.run(seed, SIZE, 10));
+
+    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
+      run(specimens.filter(predicateB).filter(predicateA)),
+    );
   });
 });
 
