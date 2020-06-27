@@ -11,10 +11,21 @@ export namespace RoseTree {
     return [f(outcome), shrinks.map((tree) => map(f, tree))];
   };
 
-  export const filter = <T>(pred: (x: T) => boolean, [outcome, shrinks]: RoseTree<T>): Sequence<RoseTree<T>> => {
-    const filteredShrinks = shrinks.bind((tree) => filter(pred, tree));
-    return pred(outcome) ? Sequence.singleton([outcome, filteredShrinks]) : filteredShrinks;
+  export const filterShrinks = <T>(pred: (x: T) => boolean, [x, xs]: RoseTree<T>): RoseTree<T> => {
+    return [x, xs.filter(([x0]) => pred(x0)).map((tree) => filterShrinks(pred, tree))];
   };
+
+  export const unfold = (() => {
+    function unfold<T, U>(fNode: (x: T) => U, fChildren: (x: T) => Sequence<T>, x: T): RoseTree<U> {
+      return [fNode(x), unfoldForest(fNode, fChildren, x)];
+    }
+
+    function unfoldForest<T, U>(fNode: (x: T) => U, fChildren: (x: T) => Sequence<T>, x: T): Sequence<RoseTree<U>> {
+      return fChildren(x).map((y) => unfold(fNode, fChildren, y));
+    }
+
+    return unfold;
+  })();
 }
 
 export default RoseTree;

@@ -32,17 +32,20 @@ namespace Specimens {
   export const zip = <T1, T2>(s1: Specimens<T1>, s2: Specimens<T2>): Specimens<[T1, T2]> =>
     bind((t1) => map((t2) => [t1, t2], s2), s1);
 
-  const applyFilter = <T>(pred: (x: T) => boolean) => (specimen: Specimen<RoseTree<T>>): Specimen<RoseTree<T>> =>
-    Specimen.isAccepted(specimen) && !pred(RoseTree.outcome(specimen)) ? Skipped : specimen;
+  const applyFilter = <T>(pred: (x: T) => boolean) => (specimen: Specimen<RoseTree<T>>): Specimen<RoseTree<T>> => {
+    if (Specimen.isDiscarded(specimen)) {
+      return specimen;
+    }
+
+    if (!pred(RoseTree.outcome(specimen))) {
+      return Skipped;
+    }
+
+    return RoseTree.filterShrinks(pred, specimen);
+  };
 
   export const filter = <T>(pred: (x: T) => boolean, specimens: Specimens<T>): Specimens<T> =>
     Random.spread(function* (seed, size, specimen) {
-      if (Specimen.isAccepted(specimen) === false) {
-        // Specimen was discarded in a previous filter
-        yield [seed, specimen] as [Seed, Specimen<RoseTree<T>>];
-        return;
-      }
-
       // Starting with the current, create an infinite sequence of specimens so we can do our best to find one that
       // passes the predicate.
       const specimensReplicatedIndefinitely = Sequence.concat<[Seed, Specimen<RoseTree<T>>]>(
@@ -58,7 +61,7 @@ namespace Specimens {
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> => {
     const r = Random.integral(numeric, range);
     const shrink = Shrink.towards(numeric, range.origin);
-    const f = (x: N): RoseTree<N> => [x, shrink(x).map(RoseTree.singleton)];
+    const f = (x: N): RoseTree<N> => RoseTree.unfold((x) => x, shrink, x);
     return Random.map<N, Specimen<RoseTree<N>>>(f, r);
   };
 
@@ -73,36 +76,40 @@ namespace Specimens {
     return map((ix) => arr[ix], integer(range));
   };
 
-  export const run = <T>(
+  const generateTreeSpecimens = <T>(
     seed: Seed,
     size: Size,
     count: number,
     specimens: Specimens<T>,
-  ): Iterable<T | typeof Skipped | typeof Exhausted> =>
+  ): Sequence<Specimen<RoseTree<T>>> =>
     Random.run(seed, size, Random.repeat(specimens))
       .map(([, specimen]) => specimen)
       .expand(ExhaustionStrategy.apply(ExhaustionStrategy.followingConsecutiveSkips(10)))
-      .takeWhileInclusive((x) => Specimen.isNotExhausted(x))
-      .map((x) => (Specimen.isAccepted(x) ? RoseTree.outcome(x) : x))
+      .takeWhileInclusive((specimen) => specimen !== Exhausted)
       .take(count);
 
-  export const runAccepted = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Iterable<T> =>
-    Random.run(seed, size, Random.repeat(specimens))
-      .map(([, specimen]) => specimen)
-      .expand(ExhaustionStrategy.apply(ExhaustionStrategy.followingConsecutiveSkips(10)))
-      .takeWhile(Specimen.isNotExhausted)
-      .filter(Specimen.isAccepted)
-      .map(RoseTree.outcome)
-      .take(count);
-
-  export const sample = <T>(
+  export const generateSpecimens = <T>(
+    seed: Seed,
     size: Size,
     count: number,
     specimens: Specimens<T>,
-  ): Iterable<T | typeof Skipped | typeof Exhausted> => run(Seed.spawn(), size, count, specimens);
+  ): Sequence<T | typeof Skipped | typeof Exhausted> =>
+    generateTreeSpecimens(seed, size, count, specimens).map((specimen) =>
+      Specimen.map((x) => RoseTree.outcome(x), specimen),
+    );
 
-  export const sampleAccepted = <T>(size: Size, count: number, specimens: Specimens<T>): Iterable<T> =>
-    runAccepted(Seed.spawn(), size, count, specimens);
+  export const generateTrees = <T>(
+    seed: Seed,
+    size: Size,
+    count: number,
+    specimens: Specimens<T>,
+  ): Sequence<RoseTree<T>> => generateTreeSpecimens(seed, size, count, specimens).filter(Specimen.isAccepted);
+
+  export const generate = <T>(seed: Seed, size: Size, count: number, specimens: Specimens<T>): Sequence<T> =>
+    Sequence.from(generateSpecimens(seed, size, count, specimens)).filter(Specimen.isAccepted);
+
+  export const sampleTree = <T>(size: Size, count: number, specimens: Specimens<T>): Iterable<RoseTree<T>> =>
+    generateTrees(Seed.spawn(), size, count, specimens);
 }
 
 export class SpecimensBuilder<T> {
@@ -122,20 +129,28 @@ export class SpecimensBuilder<T> {
     return new SpecimensBuilder(Specimens.filter(pred, this.specimens)) as this;
   }
 
-  public sample(size: Size, count: number): Iterable<T | typeof Skipped | typeof Exhausted> {
-    return Specimens.sample(size, count, this.specimens);
+  public sample(size: Size, count: number): Iterable<T> {
+    return Specimens.generate(Seed.spawn(), size, count, this.specimens);
   }
 
-  public sampleAccepted(size: Size, count: number): Iterable<T> {
-    return Specimens.sampleAccepted(size, count, this.specimens);
+  public sampleTrees(size: Size, count: number): Iterable<RoseTree<T>> {
+    return Specimens.generateTrees(Seed.spawn(), size, count, this.specimens);
   }
 
-  public run(seed: Seed, size: Size, count: number): Iterable<T | typeof Skipped | typeof Exhausted> {
-    return Specimens.run(seed, size, count, this.specimens);
+  public sampleSpecimens(size: Size, count: number): Iterable<T | typeof Skipped | typeof Exhausted> {
+    return Specimens.generateSpecimens(Seed.spawn(), size, count, this.specimens);
   }
 
-  public runAccepted(seed: Seed, size: Size, count: number): Iterable<T> {
-    return Specimens.runAccepted(seed, size, count, this.specimens);
+  public generate(seed: Seed, size: Size, count: number): Iterable<T> {
+    return Specimens.generate(seed, size, count, this.specimens);
+  }
+
+  public generateTrees(seed: Seed, size: Size, count: number): Iterable<RoseTree<T>> {
+    return Specimens.generateTrees(seed, size, count, this.specimens);
+  }
+
+  public generateSpecimens(seed: Seed, size: Size, count: number): Iterable<T | typeof Skipped | typeof Exhausted> {
+    return Specimens.generateSpecimens(seed, size, count, this.specimens);
   }
 }
 

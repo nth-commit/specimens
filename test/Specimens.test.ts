@@ -1,5 +1,6 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
 import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
+import { RoseTreeExtensions } from './Util';
 
 const SIZE = 50;
 
@@ -7,19 +8,34 @@ const setDifference = <T>(a: Set<T>, b: Set<T>): Set<T> => {
   return new Set([...a].filter((x) => !b.has(x)));
 };
 
-test('Specimens.map', () => {
-  const specimens = Specimens.integer(IntegerRange.constant(0, 0)).map((x) => x + 1);
+describe('Specimens.map', () => {
+  test('It maps the outcome', () => {
+    const f = (x: number): number => x + 1;
+    const seed = Seed.spawn();
+    const unmappedSpecimens = Specimens.integer(IntegerRange.constant(0, 10));
+    const mappedSpecimens = unmappedSpecimens.map(f);
 
-  const results = new Set(specimens.sampleAccepted(SIZE, 100));
+    const generate = (specimens: SpecimensBuilder<number>): number[] => Array.from(specimens.generate(seed, SIZE, 100));
 
-  results.forEach((x) => expect(x).toStrictEqual(1));
+    expect(generate(mappedSpecimens)).toEqual(generate(unmappedSpecimens).map(f));
+  });
+
+  test('It maps the shrinks', () => {
+    const seed: Seed = { split: () => [seed, seed], nextInt: () => 10 };
+    const specimens = Specimens.integer(IntegerRange.constant(0, 10)).map((x) => x + 1);
+
+    const tree = Array.from(specimens.generateTrees(seed, SIZE, 1))[0];
+    const directShrinks = RoseTreeExtensions.directShrinks(tree);
+
+    expect(directShrinks).toEqual([1, 6, 3, 2]);
+  });
 });
 
 describe('Specimens.filter', () => {
   test('It exhausts with an impossible predicate', () => {
-    const specimens = Specimens.integer(IntegerRange.constant(0, 0)).filter(() => false);
+    const specimens = Specimens.integer(IntegerRange.constant(0, 10)).filter(() => false);
 
-    const results = new Set(specimens.sample(SIZE, 100));
+    const results = new Set(specimens.sampleSpecimens(SIZE, 11));
 
     expect(results).toContain(Exhausted);
   });
@@ -28,7 +44,7 @@ describe('Specimens.filter', () => {
     const predicate = (x: number): boolean => x % 2 === 0;
     const filteredSpecimens = Specimens.integer(IntegerRange.constant(0, 10)).filter(predicate);
 
-    const passingResults = new Set(filteredSpecimens.sampleAccepted(SIZE, 100));
+    const passingResults = new Set(filteredSpecimens.sample(SIZE, 100));
 
     passingResults.forEach((x) => expect(predicate(x)).toStrictEqual(true));
   });
@@ -39,11 +55,21 @@ describe('Specimens.filter', () => {
     const filteredSpecimens = unfilteredSpecimens.filter(predicate);
 
     const failingResults = setDifference(
-      new Set(unfilteredSpecimens.sampleAccepted(SIZE, 100)),
-      new Set(filteredSpecimens.sampleAccepted(SIZE, 100)),
+      new Set(unfilteredSpecimens.sample(SIZE, 100)),
+      new Set(filteredSpecimens.sample(SIZE, 100)),
     );
 
     failingResults.forEach((x) => expect(predicate(x)).toStrictEqual(false));
+  });
+
+  test('It filters the shrinks', () => {
+    const seed: Seed = { split: () => [seed, seed], nextInt: () => 10 };
+    const specimens = Specimens.integer(IntegerRange.constant(0, 10)).filter((x) => x >= 5);
+
+    const tree = Array.from(specimens.generateTrees(seed, SIZE, 1))[0];
+    const directShrinks = RoseTreeExtensions.directShrinks(tree);
+
+    expect(directShrinks).toEqual([5]);
   });
 
   test('It is composable', () => {
@@ -52,11 +78,11 @@ describe('Specimens.filter', () => {
     const specimens = Specimens.integer(IntegerRange.constant(1, 6));
 
     const seed = Seed.create(0);
-    const run = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
-      Array.from(specimens.run(seed, SIZE, 10));
+    const generateSpecimens = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+      Array.from(specimens.generateSpecimens(seed, SIZE, 10));
 
-    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
-      run(specimens.filter((x) => predicateA(x) && predicateB(x))),
+    expect(generateSpecimens(specimens.filter(predicateA).filter(predicateB))).toEqual(
+      generateSpecimens(specimens.filter((x) => predicateA(x) && predicateB(x))),
     );
   });
 
@@ -66,11 +92,11 @@ describe('Specimens.filter', () => {
     const specimens = Specimens.integer(IntegerRange.constant(1, 6));
 
     const seed = Seed.create(0);
-    const run = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
-      Array.from(specimens.run(seed, SIZE, 10));
+    const generateSpecimens = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+      Array.from(specimens.generateSpecimens(seed, SIZE, 10));
 
-    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
-      run(specimens.filter(predicateB).filter(predicateA)),
+    expect(generateSpecimens(specimens.filter(predicateA).filter(predicateB))).toEqual(
+      generateSpecimens(specimens.filter(predicateB).filter(predicateA)),
     );
   });
 });
@@ -81,8 +107,8 @@ describe('Specimens.zip', () => {
     const specimensLeft = Specimens.integer(IntegerRange.constant(1, 10));
     const specimensZipped = Specimens.zip(specimensLeft, Specimens.constant(0));
 
-    const zippedResults = Array.from(specimensZipped.runAccepted(seed, SIZE, 10));
-    const leftResults = Array.from(specimensLeft.runAccepted(seed, SIZE, 10));
+    const zippedResults = Array.from(specimensZipped.generate(seed, SIZE, 10));
+    const leftResults = Array.from(specimensLeft.generate(seed, SIZE, 10));
 
     expect(zippedResults.map(([left]) => left)).toEqual(leftResults);
   });
@@ -92,8 +118,8 @@ describe('Specimens.zip', () => {
     const specimensRight = Specimens.integer(IntegerRange.constant(1, 10));
     const specimensZipped = Specimens.zip(Specimens.constant(0), specimensRight);
 
-    const zippedResults = Array.from(specimensZipped.runAccepted(seed, SIZE, 10));
-    const rightResults = Array.from(specimensRight.runAccepted(seed, SIZE, 10));
+    const zippedResults = Array.from(specimensZipped.generate(seed, SIZE, 10));
+    const rightResults = Array.from(specimensRight.generate(seed, SIZE, 10));
 
     expect(zippedResults.map(([, right]) => right)).toEqual(rightResults);
   });
@@ -101,7 +127,7 @@ describe('Specimens.zip', () => {
   test('It is exhausted if its left component is exhausted', () => {
     const specimens = Specimens.zip(Specimens.exhausted(), Specimens.constant(0));
 
-    const results = Array.from(specimens.sample(SIZE, 1));
+    const results = Array.from(specimens.sampleSpecimens(SIZE, 1));
 
     expect(results).toEqual([Exhausted]);
   });
@@ -109,7 +135,7 @@ describe('Specimens.zip', () => {
   test('It is exhausted if its right component is exhausted', () => {
     const specimens = Specimens.zip(Specimens.constant(0), Specimens.exhausted());
 
-    const results = Array.from(specimens.sample(SIZE, 1));
+    const results = Array.from(specimens.sampleSpecimens(SIZE, 1));
 
     expect(results).toEqual([Exhausted]);
   });
@@ -119,19 +145,19 @@ describe('Specimens.integer', () => {
   const range = IntegerRange.constant(0, 10);
 
   test('All specimens are accepted', () => {
-    const results = Array.from(Specimens.integer(range).sample(SIZE, 100));
+    const results = Array.from(Specimens.integer(range).sampleSpecimens(SIZE, 100));
 
     results.forEach((x) => expect(Specimen.isAccepted(x)).toEqual(true));
   });
 
   test('All specimens integers', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 100));
+    const results = Array.from(Specimens.integer(range).sample(SIZE, 100));
 
     results.forEach((r) => expect(r).toStrictEqual(Math.round(r)));
   });
 
   test('All specimens are within the range', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 100));
+    const results = Array.from(Specimens.integer(range).sample(SIZE, 100));
 
     results.forEach((r) => {
       const [min, max] = IntegerRange.bounds(SIZE, range);
@@ -141,7 +167,7 @@ describe('Specimens.integer', () => {
   });
 
   test('Specimens are evenly distributed', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
+    const results = Array.from(Specimens.integer(range).sample(SIZE, 10000));
 
     expect(mean(results)).toBeGreaterThan(4.9);
     expect(mean(results)).toBeLessThan(5.1);
@@ -149,7 +175,7 @@ describe('Specimens.integer', () => {
   });
 
   test('Specimens occupy the range', () => {
-    const results = Array.from(Specimens.integer(range).sampleAccepted(SIZE, 10000));
+    const results = Array.from(Specimens.integer(range).sample(SIZE, 10000));
 
     const [expectedMin, expectedMax] = IntegerRange.bounds(SIZE, range);
     expect(min(results)).toEqual(expectedMin);
@@ -159,9 +185,22 @@ describe('Specimens.integer', () => {
   test('Specimens are repeatable', () => {
     const seed = Seed.spawn();
 
-    const sample = () => Array.from(Specimens.integer(range).runAccepted(seed, SIZE, 100));
+    const generate = () => Array.from(Specimens.integer(range).generate(seed, SIZE, 100));
 
-    expect(sample()).toEqual(sample());
+    expect(generate()).toEqual(generate());
+  });
+
+  test.each`
+    givenInteger | evaluatedTree
+    ${5}         | ${[5, [0, [2, [0, [1, [0]]]], [1, [0]]]]}
+    ${12}        | ${[12, [0, [6, [0, [3, [0, [1, [0]]]], [1, [0]]]], [3, [0, [1, [0]]]], [1, [0]]]]}
+  `('It shrinks towards the origin', ({ givenInteger, evaluatedTree }) => {
+    const seed: Seed = { split: () => [seed, seed], nextInt: () => givenInteger };
+    const specimen = Specimens.integer(IntegerRange.constant(0, givenInteger));
+
+    const tree = RoseTreeExtensions.evaluate<number>(Array.from(specimen.generateTrees(seed, SIZE, 1))[0]);
+
+    expect(tree).toEqual(evaluatedTree);
   });
 });
 
@@ -169,7 +208,7 @@ describe('Specimens.item', () => {
   test('Given an empty array, it immediately exhausts', () => {
     const arr: unknown[] = [];
 
-    const results = Array.from(Specimens.item(arr).sample(10, 100));
+    const results = Array.from(Specimens.item(arr).sampleSpecimens(10, 100));
 
     expect(results).toEqual([Exhausted]);
   });
@@ -177,7 +216,7 @@ describe('Specimens.item', () => {
   test('Given a non-empty array, all specimens are accepted', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sample(SIZE, 100));
+    const results = Array.from(Specimens.item(arr).sampleSpecimens(SIZE, 100));
 
     results.forEach((x) => expect(Specimen.isAccepted(x)).toEqual(true));
   });
@@ -185,7 +224,7 @@ describe('Specimens.item', () => {
   test('All specimens are items in the array', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 100));
+    const results = Array.from(Specimens.item(arr).sample(SIZE, 100));
 
     results.forEach((x) => expect(arr).toContain(x));
   });
@@ -193,7 +232,7 @@ describe('Specimens.item', () => {
   test('Specimens are evenly distributed', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
+    const results = Array.from(Specimens.item(arr).sample(SIZE, 10000));
 
     expect(mean(results)).toBeGreaterThan(4.9);
     expect(mean(results)).toBeLessThan(5.1);
@@ -203,7 +242,7 @@ describe('Specimens.item', () => {
   test('Specimens occupy the range', () => {
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const results = Array.from(Specimens.item(arr).sampleAccepted(SIZE, 10000));
+    const results = Array.from(Specimens.item(arr).sample(SIZE, 10000));
 
     expect(min(results)).toEqual(min(arr));
     expect(max(results)).toEqual(max(arr));
@@ -213,8 +252,8 @@ describe('Specimens.item', () => {
     const seed = Seed.spawn();
     const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    const sample = () => Array.from(Specimens.item(arr).run(seed, SIZE, 100));
+    const generateSpecimens = () => Array.from(Specimens.item(arr).generateSpecimens(seed, SIZE, 100));
 
-    expect(sample()).toEqual(sample());
+    expect(generateSpecimens()).toEqual(generateSpecimens());
   });
 });

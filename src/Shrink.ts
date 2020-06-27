@@ -12,7 +12,7 @@ export namespace Shrink {
 
       const two = numeric.add(numeric.ONE, numeric.ONE);
       const next = numeric.div(previous, two);
-      if (numeric.eq(previous, next)) {
+      if (numeric.eq(previous, next) || numeric.eq(next, numeric.ZERO)) {
         return undefined;
       }
 
