@@ -1,5 +1,5 @@
 import { mean, sampleSkewness, min, max } from 'simple-statistics';
-import { Seed, Specimens, Exhausted, IntegerRange, Specimen, SpecimensBuilder } from '../src';
+import { Seed, Specimens, Exhausted, IntegerRange, Specimen } from '../src';
 import { RoseTreeExtensions } from './Util';
 
 const SIZE = 50;
@@ -15,7 +15,7 @@ describe('Specimens.map', () => {
     const unmappedSpecimens = Specimens.integer(IntegerRange.constant(0, 10));
     const mappedSpecimens = unmappedSpecimens.map(f);
 
-    const generate = (specimens: SpecimensBuilder<number>): number[] => Array.from(specimens.generate(seed, SIZE, 100));
+    const generate = (specimens: Specimens<number>): number[] => Array.from(specimens.generate(seed, SIZE, 100));
 
     expect(generate(mappedSpecimens)).toEqual(generate(unmappedSpecimens).map(f));
   });
@@ -78,7 +78,7 @@ describe('Specimens.filter', () => {
     const specimens = Specimens.integer(IntegerRange.constant(1, 6));
 
     const seed = Seed.create(0);
-    const generateSpecimens = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+    const generateSpecimens = (specimens: Specimens<number>): Array<Specimen<number>> =>
       Array.from(specimens.generateSpecimens(seed, SIZE, 10));
 
     expect(generateSpecimens(specimens.filter(predicateA).filter(predicateB))).toEqual(
@@ -92,7 +92,7 @@ describe('Specimens.filter', () => {
     const specimens = Specimens.integer(IntegerRange.constant(1, 6));
 
     const seed = Seed.create(0);
-    const generateSpecimens = (specimens: SpecimensBuilder<number>): Array<Specimen<number>> =>
+    const generateSpecimens = (specimens: Specimens<number>): Array<Specimen<number>> =>
       Array.from(specimens.generateSpecimens(seed, SIZE, 10));
 
     expect(generateSpecimens(specimens.filter(predicateA).filter(predicateB))).toEqual(

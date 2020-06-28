@@ -11,51 +11,79 @@ export namespace Production {
   export const map = <T, U>(f: (x: T) => U, [seed, x]: Production<T>): Production<U> => [seed, f(x)];
 }
 
-export type Random<T> = (seed: Seed, size: Size) => Sequence<Production<T>>;
+export type RandomF<T> = (seed: Seed, size: Size) => Sequence<Production<T>>;
 
-export namespace Random {
-  export const run = <T>(seed: Seed, size: Size, r: Random<T>): Sequence<[Seed, T]> => r(seed, size);
+export type Random<T> = {
+  map<U>(f: (x: T) => U): Random<U>;
+  bind<U>(f: (x: T) => Random<U>): Random<U>;
+  spread<U>(f: (seed: Seed, size: Size, x: T) => Generator<Production<U>>): Random<U>;
+  repeat(): Random<T>;
+  run(seed: Seed, size: Size): Sequence<Production<T>>;
+  toFunction(): RandomF<T>;
+};
 
-  export const map = <T, U>(f: (x: T) => U, r: Random<T>): Random<U> => (seed, size) =>
-    r(seed, size).map((p) => Production.map(f, p));
+class RandomBuilder<T> implements Random<T> {
+  constructor(readonly randomF: RandomF<T>) {}
 
-  export const bind = <T, U>(f: (x: T) => Random<U>, r: Random<T>): Random<U> => (seed, size) => {
-    return Sequence.fromGenerator(function* () {
-      for (const [seedX, x] of Random.run(seed, size, r)) {
-        for (const [seedY, y] of Random.run(seedX, size, f(x))) {
-          yield* Production.one(seedY, y);
+  map<U>(f: (x: T) => U): RandomBuilder<U> {
+    const { randomF } = this;
+    return new RandomBuilder<U>((seed, size) => randomF(seed, size).map((p) => Production.map(f, p)));
+  }
+
+  bind<U>(f: (x: T) => RandomBuilder<U>): RandomBuilder<U> {
+    const r = this;
+    return new RandomBuilder<U>((seed, size) =>
+      Sequence.fromGenerator(function* () {
+        for (const [seedX, x] of r.run(seed, size)) {
+          for (const [seedY, y] of f(x).run(seedX, size)) {
+            yield* Production.one(seedY, y);
+          }
         }
-      }
+      }),
+    );
+  }
+
+  spread<U>(f: (seed: Seed, size: Size, x: T) => Generator<Production<U>>): RandomBuilder<U> {
+    const r = this;
+    return new RandomBuilder<U>((seed, size) =>
+      Sequence.fromGenerator(function* () {
+        for (const [seedX, x] of r.run(seed, size)) {
+          yield* f(seedX, size, x);
+        }
+      }),
+    );
+  }
+
+  repeat(): RandomBuilder<T> {
+    const r = this;
+    return new RandomBuilder<T>((seed, size) => {
+      let currentSeed = seed;
+      return Sequence.infinite()
+        .bind(() => r.run(currentSeed, size))
+        .tap(([seed]) => {
+          currentSeed = seed;
+        });
     });
-  };
+  }
 
-  export const spread = <T, U>(
-    f: (seed: Seed, size: Size, x: T) => Generator<Production<U>>,
-    r: Random<T>,
-  ): Random<U> => (seed, size) => {
-    return Sequence.fromGenerator(function* () {
-      for (const [seedX, x] of Random.run(seed, size, r)) {
-        yield* f(seedX, size, x);
-      }
-    });
-  };
+  run(seed: Seed, size: Size): Sequence<Production<T>> {
+    return this.randomF(seed, size);
+  }
 
-  export const constant = <T>(x: T): Random<T> => (seed) => Production.one(seed, x);
-
-  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Random<N> => (seed, size) => {
-    const [min, max] = range.getSizedBounds(size);
-    const [leftSeed, rightSeed] = seed.split();
-    return Production.one(leftSeed, numeric.random(rightSeed, min, max));
-  };
-
-  export const repeat = <T>(r: Random<T>): Random<T> => (seed, size) => {
-    let currentSeed = seed;
-    return Sequence.infinite()
-      .bind(() => run(currentSeed, size, r))
-      .tap(([seed]) => {
-        currentSeed = seed;
-      });
-  };
+  toFunction(): RandomF<T> {
+    return this.randomF;
+  }
 }
 
-export default Random;
+export namespace Random {
+  export const constant = <U>(x: U): Random<U> => new RandomBuilder((seed) => Production.one(seed, x));
+
+  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Random<N> =>
+    new RandomBuilder((seed, size) => {
+      const [min, max] = range.getSizedBounds(size);
+      const [leftSeed, rightSeed] = seed.split();
+      return Production.one(leftSeed, numeric.random(rightSeed, min, max));
+    });
+
+  export const from = <T>(f: RandomF<T>): Random<T> => new RandomBuilder(f);
+}

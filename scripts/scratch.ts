@@ -1,6 +1,6 @@
-import { Specimens, IntegerRange, Specimen, Seed, Shrink, Integer, Sequence, SpecimensBuilder } from '../src';
+import { Specimens, IntegerRange, Specimen, Seed, Shrink, Integer, Sequence } from '../src';
 
-const repeat = <T>(s: SpecimensBuilder<T>, times: number): SpecimensBuilder<T> =>
+const repeat = <T>(s: Specimens<T>, times: number): Specimens<T> =>
   s.bind((x) =>
     Specimens.createUnshrinkable((seed) =>
       Sequence.infinite()
