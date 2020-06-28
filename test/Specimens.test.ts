@@ -103,10 +103,10 @@ describe('Specimens.filter', () => {
 
 describe('Specimens.zip', () => {
   test('It has equivalency with its left component', () => {
-    const seed = Seed.spawn();
     const specimensLeft = Specimens.integer(IntegerRange.constant(1, 10));
     const specimensZipped = Specimens.zip(specimensLeft, Specimens.constant(0));
 
+    const seed = Seed.spawn();
     const zippedResults = Array.from(specimensZipped.generate(seed, SIZE, 10));
     const leftResults = Array.from(specimensLeft.generate(seed, SIZE, 10));
 
@@ -114,10 +114,10 @@ describe('Specimens.zip', () => {
   });
 
   test('It has equivalency with its right component', () => {
-    const seed = Seed.spawn();
     const specimensRight = Specimens.integer(IntegerRange.constant(1, 10));
     const specimensZipped = Specimens.zip(Specimens.constant(0), specimensRight);
 
+    const seed = Seed.spawn();
     const zippedResults = Array.from(specimensZipped.generate(seed, SIZE, 10));
     const rightResults = Array.from(specimensRight.generate(seed, SIZE, 10));
 

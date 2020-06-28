@@ -26,6 +26,17 @@ export namespace RoseTree {
 
     return unfold;
   })();
+
+  export const bind = <T, U>(f: (x: T) => RoseTree<U>, [x, xs]: RoseTree<T>): RoseTree<U> => {
+    const [y, ys] = f(x);
+    return [
+      y,
+      Sequence.concat(
+        ys,
+        xs.map((t) => bind(f, t)),
+      ),
+    ];
+  };
 }
 
 export default RoseTree;

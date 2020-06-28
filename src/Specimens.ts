@@ -10,6 +10,8 @@ import ExhaustionStrategy from './ExhaustionStrategy';
 
 export type Specimens<T> = Random<Specimen<RoseTree<T>>>;
 
+const id = <T>(x: T): T => x;
+
 namespace Specimens {
   const singleton = <T>(x: Specimen<RoseTree<T>>): Specimens<T> => Random.constant(x);
 
@@ -58,12 +60,13 @@ namespace Specimens {
         .takeWhileInclusive(Specimen.isDiscarded);
     }, specimens);
 
-  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> => {
-    const r = Random.integral(numeric, range);
-    const shrink = Shrink.towards(numeric, range.origin);
-    const f = (x: N): RoseTree<N> => RoseTree.unfold((x) => x, shrink, x);
-    return Random.map<N, Specimen<RoseTree<N>>>(f, r);
+  export const create = <T>(r: Random<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> => {
+    const toTree = (x: T): RoseTree<T> => RoseTree.unfold(id, shrinker, x);
+    return Random.map(toTree, r);
   };
+
+  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> =>
+    create(Random.integral(numeric, range), Shrink.towards(numeric, range.origin));
 
   export const integer = (range: Range<number>): Specimens<number> => integral(Integer, range);
 
@@ -153,6 +156,12 @@ export class SpecimensBuilder<T> {
     return Specimens.generateSpecimens(seed, size, count, this.specimens);
   }
 }
+
+export const create = <T>(r: Random<T>, shrinker: (x: T) => Sequence<T>): SpecimensBuilder<T> =>
+  new SpecimensBuilder<T>(Specimens.create(r, shrinker));
+
+export const createUnshrinkable = <T>(r: Random<T>): SpecimensBuilder<T> =>
+  new SpecimensBuilder<T>(Specimens.create(r, () => Sequence.empty()));
 
 export const constant = <T>(x: T) => new SpecimensBuilder(Specimens.constant(x));
 

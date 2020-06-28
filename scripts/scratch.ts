@@ -1,10 +1,29 @@
-import { Specimens, IntegerRange, Specimen, Seed, Shrink, Integer } from '../src';
+import { Specimens, IntegerRange, Specimen, Seed, Shrink, Integer, Sequence, SpecimensBuilder } from '../src';
 
-for (const x of Specimens.integer(IntegerRange.constant(0, 100)).sample(10000, 10)) {
+const repeat = <T>(s: SpecimensBuilder<T>, times: number): SpecimensBuilder<T> =>
+  s.bind((x) =>
+    Specimens.createUnshrinkable((seed) =>
+      Sequence.infinite()
+        .map(() => [seed, x] as [Seed, T])
+        .take(times),
+    ),
+  );
+
+const specimensLeft = repeat(Specimens.integer(IntegerRange.constant(0, 10)), 2);
+
+const specimensRight = Specimens.integer(IntegerRange.constant(0, 10));
+
+const specimens = Specimens.zip(specimensLeft, specimensRight);
+
+const seed = Seed.spawn();
+
+for (const x of specimensRight.generate(seed, 50, 10)) {
   console.log(x);
 }
 
-console.log(Shrink.towards(Integer, 0)(100).toArray());
+for (const x of specimens.generate(seed, 50, 10)) {
+  console.log(x);
+}
 
 // const loggingSeedDecorator = (seed: Seed, idPath: Array<'L' | 'R'> = []): Seed => {
 //   const log = (msg: string) => {

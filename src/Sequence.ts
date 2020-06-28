@@ -98,6 +98,12 @@ export class Sequence<T> implements Iterable<T> {
     return new Sequence<T>(this.iterable.pipe(takeLast(n)));
   }
 
+  first(): T | undefined {
+    for (const x of this.take(1)) {
+      return x;
+    }
+  }
+
   last(): T | undefined {
     for (const x of this.takeLast(1)) {
       return x;
