@@ -15,7 +15,7 @@ export namespace Seed {
     },
   });
 
-  export const create = (seed: number): Seed => makeSeed(mersenne(seed));
+  export const create = (seeder: number): Seed => makeSeed(mersenne(seeder));
 
   export const spawn = (): Seed => create(new Date().getTime());
 }

@@ -8,7 +8,7 @@ export type Production<T> = [Seed, T];
 export namespace Production {
   export const one = <T>(seed: Seed, x: T): Sequence<Production<T>> => Sequence.singleton([seed, x]);
 
-  export const map = <T, U>(f: (x: T) => U, [seed, x]: Production<T>): Production<U> => [seed, f(x)];
+  export const map = <T, U>([seed, x]: Production<T>, f: (x: T) => U): Production<U> => [seed, f(x)];
 }
 
 export type RandomF<T> = (seed: Seed, size: Size) => Sequence<Production<T>>;
@@ -16,7 +16,7 @@ export type RandomF<T> = (seed: Seed, size: Size) => Sequence<Production<T>>;
 export type Random<T> = {
   map<U>(f: (x: T) => U): Random<U>;
   bind<U>(f: (x: T) => Random<U>): Random<U>;
-  spread<U>(f: (seed: Seed, size: Size, x: T) => Generator<Production<U>>): Random<U>;
+  spread<U>(f: (seed: Seed, size: Size) => (x: T) => Generator<Production<U>>): Random<U>;
   repeat(): Random<T>;
   run(seed: Seed, size: Size): Sequence<Production<T>>;
   toFunction(): RandomF<T>;
@@ -27,7 +27,7 @@ class RandomBuilder<T> implements Random<T> {
 
   map<U>(f: (x: T) => U): RandomBuilder<U> {
     const { randomF } = this;
-    return new RandomBuilder<U>((seed, size) => randomF(seed, size).map((p) => Production.map(f, p)));
+    return new RandomBuilder<U>((seed, size) => randomF(seed, size).map((p) => Production.map(p, f)));
   }
 
   bind<U>(f: (x: T) => RandomBuilder<U>): RandomBuilder<U> {
@@ -43,12 +43,12 @@ class RandomBuilder<T> implements Random<T> {
     );
   }
 
-  spread<U>(f: (seed: Seed, size: Size, x: T) => Generator<Production<U>>): RandomBuilder<U> {
+  spread<U>(f: (seed: Seed, size: Size) => (x: T) => Generator<Production<U>>): RandomBuilder<U> {
     const r = this;
     return new RandomBuilder<U>((seed, size) =>
       Sequence.fromGenerator(function* () {
         for (const [seedX, x] of r.run(seed, size)) {
-          yield* f(seedX, size, x);
+          yield* f(seedX, size)(x);
         }
       }),
     );

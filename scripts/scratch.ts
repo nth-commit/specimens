@@ -1,54 +1,37 @@
-import { Specimens, IntegerRange, Specimen, Seed, Shrink, Integer, Sequence } from '../src';
+import { IntegerRange, Seed, Shrink, Integer, Sequence, Specimens } from '../src';
+import { generateSpecimens } from '../test/Util';
 
-const repeat = <T>(s: Specimens<T>, times: number): Specimens<T> =>
-  s.bind((x) =>
-    Specimens.createUnshrinkable((seed) =>
-      Sequence.infinite()
-        .map(() => [seed, x] as [Seed, T])
-        .take(times),
-    ),
-  );
+const loggingSeedDecorator = (seed: Seed, idPath: Array<'L' | 'R'> = []): Seed => {
+  const id = idPath.join(':');
 
-const specimensLeft = repeat(Specimens.integer(IntegerRange.constant(0, 10)), 2);
+  const log = (msg: string) => {
+    console.log(`Seed[${id}] - ${msg}`);
+  };
 
-const specimensRight = Specimens.integer(IntegerRange.constant(0, 10));
+  return {
+    _id: id,
+    nextInt: (min, max) => {
+      const x = seed.nextInt(min, max);
+      log(`nextInt(${min}, ${max}) => ${x}`);
+      return x;
+    },
+    split: () => {
+      log('split()');
+      return seed.split().map((s, i) => loggingSeedDecorator(s, [...idPath, i === 0 ? 'L' : 'R'])) as [Seed, Seed];
+    },
+  } as Seed;
+};
 
-const specimens = Specimens.zip(specimensLeft, specimensRight);
+const predicateA = (x: number): boolean => x % 2 === 0;
+const predicateB = (x: number): boolean => x % 3 === 0;
+const specimens = Specimens.integer(IntegerRange.constant(1, 6));
 
-const seed = Seed.spawn();
+const seed = loggingSeedDecorator(Seed.create(3));
+// const test = generateSpecimens(specimens, seed, 10);
+// console.log(test);
 
-for (const x of specimensRight.generate(seed, 50, 10)) {
-  console.log(x);
-}
+// const test2 = generateSpecimens(specimens.filter(predicateA).filter(predicateB), seed, 10);
+// console.log(test2);
 
-for (const x of specimens.generate(seed, 50, 10)) {
-  console.log(x);
-}
-
-// const loggingSeedDecorator = (seed: Seed, idPath: Array<'L' | 'R'> = []): Seed => {
-//   const log = (msg: string) => {
-//     console.log(`Seed[${idPath.join(':')}] - ${msg}`);
-//   };
-
-//   return {
-//     nextInt: (min, max) => {
-//       const x = seed.nextInt(min, max);
-//       log(`nextInt(${min}, ${max}) => ${x}`);
-//       return x;
-//     },
-//     split: () => {
-//       log('split()');
-//       return seed.split().map((s, i) => loggingSeedDecorator(s, [...idPath, i === 0 ? 'L' : 'R'])) as [Seed, Seed];
-//     },
-//   };
-// };
-
-// const seed = loggingSeedDecorator(Seed.create(0));
-
-// const specimens2 = Specimens.integer(IntegerRange.constant(0, 10))
-//   .filter((x) => x > 10)
-//   .generateSpecimens(seed, 50, 10);
-
-// for (const s of specimens2) {
-//   console.log(s);
-// }
+const test3 = generateSpecimens(specimens.filter(predicateB).filter(predicateA), seed, 6);
+console.log(test3);

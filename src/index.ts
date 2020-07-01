@@ -7,3 +7,4 @@ export * from './RoseTree';
 export * from './Seed';
 export * from './Sequence';
 export * from './Shrink';
+export { Exhausted } from './ExhaustionStrategy';

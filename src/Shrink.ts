@@ -33,6 +33,8 @@ export namespace Shrink {
     const halves = takeHalves(numeric, differenceFromDestination).map((h) => numeric.add(h, destination));
     return Sequence.concat(Sequence.singleton(destination), halves);
   };
+
+  export const none = <T>(): Shrinker<T> => () => Sequence.empty();
 }
 
 export default Shrink;

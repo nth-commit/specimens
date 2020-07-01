@@ -1,110 +1,193 @@
 import Numeric, { Integer } from './Numeric';
 import { Random, Production, RandomF } from './Random';
-import RoseTree from './RoseTree';
 import Sequence from './Sequence';
 import Range, { Size, IntegerRange } from './Range';
 import Shrink from './Shrink';
 import Seed from './Seed';
-import Specimen, { Exhausted, Skipped } from './Specimen';
-import ExhaustionStrategy from './ExhaustionStrategy';
+import { RoseTree as Tree } from './RoseTree';
+import { Specimen } from './Specimen';
+import ExhaustionStrategy, { Exhausted } from './ExhaustionStrategy';
+import { SpecimenTree } from './SpecimenTree';
 
-const id = <T>(x: T): T => x;
+export type MaybeExhaustedSpecimen<T> = Specimen<T> | typeof Exhausted;
 
-const applyFilter = <T>(f: (x: T) => boolean) => (specimen: Specimen<RoseTree<T>>): Specimen<RoseTree<T>> => {
-  if (Specimen.isDiscarded(specimen)) {
-    return specimen;
-  }
+type ProducedSpecimenTree<T> = Production<SpecimenTree<T>>;
 
-  if (!f(RoseTree.outcome(specimen))) {
-    return Skipped;
-  }
+namespace ProducedSpecimenTree {
+  export const bindTree = <T, U>(p: ProducedSpecimenTree<T>, k: (x: T) => SpecimenTree<U>): ProducedSpecimenTree<U> =>
+    Production.map(p, (t) => SpecimenTree.bind(t, k));
 
-  return RoseTree.filterShrinks(f, specimen);
-};
+  export const bindSpecimen = <T, U>(p: ProducedSpecimenTree<T>, k: (x: T) => Specimen<U>): ProducedSpecimenTree<U> =>
+    Production.map(p, (t) => SpecimenTree.bindSpecimen(t, k));
+
+  export const bind = <T, U>(
+    [seed, specimenTree]: ProducedSpecimenTree<T>,
+    k: (x: T) => ProducedSpecimenTree<U>,
+  ): ProducedSpecimenTree<U> => {
+    const specimenTree0 = SpecimenTree.map(specimenTree, k);
+
+    // TODO: Fold over tree!
+
+    const f = (s: Specimen<ProducedSpecimenTree<U>>): ProducedSpecimenTree<U> => {
+      return null as any;
+    };
+
+    const result: ProducedSpecimenTree<U> = SpecimenTree.fold(
+      specimenTree0,
+      (specimenOfT, x): ProducedSpecimenTree<U> => specimenOfT as any,
+      (x) => x,
+    );
+
+    return result;
+  };
+}
 
 export type Specimens<T> = {
+  run(seed: Seed, size: Size): Sequence<ProducedSpecimenTree<T>>;
   map<U>(f: (x: T) => U): Specimens<U>;
   bind<U>(f: (x: T) => Specimens<U>): Specimens<U>;
-  filter(f: (x: T) => boolean): Specimens<T>;
-  generateSpecimens(seed: Seed, size: Size, count: number): Sequence<T | typeof Skipped | typeof Exhausted>;
-  generateTrees(seed: Seed, size: Size, count: number): Sequence<RoseTree<T>>;
+  filter(pred: (x: T) => boolean): Specimens<T>;
+  generateSpecimens(seed: Seed, size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>>;
+  generateTrees(seed: Seed, size: Size, count: number): Sequence<Tree<T>>;
   generate(seed: Seed, size: Size, count: number): Sequence<T>;
-  sampleSpecimens(size: Size, count: number): Sequence<T | typeof Skipped | typeof Exhausted>;
-  sampleTrees(size: Size, count: number): Sequence<RoseTree<T>>;
+  sampleSpecimens(size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>>;
   sample(size: Size, count: number): Sequence<T>;
 };
 
+const mapRandomSpecimenTree = <T, U>(r: Random<Tree<Specimen<T>>>, f: (x: T) => U): Random<Tree<Specimen<U>>> =>
+  r.map((t) => SpecimenTree.map(t, f));
+
+type EnumeratedTree<T> = [T, Array<EnumeratedTree<T>>];
+
+const enumerateTree = <T>([outcome, shrinks]: Tree<T>): EnumeratedTree<T> => [
+  outcome,
+  shrinks.map(enumerateTree).toArray(),
+];
+
+const serializeEnumerateTree = <T>(tree: Tree<T>): string => JSON.stringify(enumerateTree(tree), null, 2);
+
 class SpecimensBuilder<T> implements Specimens<T> {
-  constructor(readonly random: Random<Specimen<RoseTree<T>>>) {}
+  constructor(readonly random: Random<SpecimenTree<T>>) {}
+
+  run(seed: Seed, size: Size): Sequence<ProducedSpecimenTree<T>> {
+    return this.random.run(seed, size);
+  }
 
   // About transforming specimens
 
-  map<U>(f: (x: T) => U): SpecimensBuilder<U> {
-    return new SpecimensBuilder<U>(this.random.map((s) => Specimen.map((x) => RoseTree.map(f, x), s)));
+  map<U>(f: (x: T) => U): Specimens<U> {
+    return new SpecimensBuilder<U>(mapRandomSpecimenTree(this.random, f));
   }
 
-  bind<U>(f: (x: T) => SpecimensBuilder<U>): SpecimensBuilder<U> {
-    return new SpecimensBuilder<U>(
-      this.random.bind((specimen) => {
-        if (Specimen.isAccepted(specimen)) {
-          return f(RoseTree.outcome(specimen)).random;
-        } else {
-          return Random.constant(specimen);
-        }
-      }),
-    );
+  bind<U>(f: (x: T) => Specimens<U>): Specimens<U> {
+    const r1 = Random.from((seed, size) => {
+      let currentSeed = seed;
+      const run = <V>(specimens: Specimens<V>) => {
+        return specimens
+          .run(currentSeed, size)
+          .tap(([s]) => {
+            currentSeed = s;
+          })
+          .map(([, x]) => x);
+      };
+
+      const left = run(this).toArray();
+
+      switch (left.length) {
+        case 0:
+          return Production.one(seed, SpecimenTree.rejected<U>());
+        case 1:
+          break;
+        default:
+          throw new Error('Binding specimens of length > 1 is not supported yet');
+      }
+
+      const result = Sequence.from(left)
+        .map((specimenTree1) => {
+          const specimenTree2 = SpecimenTree.bind(specimenTree1, (x) => {
+            return run(f(x)).first()!;
+          });
+
+          return specimenTree2;
+        })
+        .map((specimenTree) => [currentSeed, specimenTree] as ProducedSpecimenTree<U>);
+
+      const debug1 = result
+        .toArray()
+        .map(([, x]) => serializeEnumerateTree(x))
+        .join('\\n');
+
+      return result;
+    });
+
+    return new SpecimensBuilder<U>(r1);
   }
 
-  filter(f: (x: T) => boolean): SpecimensBuilder<T> {
+  filter(pred: (x: T) => boolean): Specimens<T> {
     const { random } = this;
-    return new SpecimensBuilder(
-      random.spread(function* (seed, size, specimen) {
-        // Starting with the current, create an infinite sequence of specimens so we can do our best to find one that
-        // passes the predicate.
-        const specimensReplicatedIndefinitely = Sequence.concat<[Seed, Specimen<RoseTree<T>>]>(
-          Sequence.singleton([seed, specimen]),
-          random.repeat().run(seed, size),
-        );
+    return new SpecimensBuilder<T>(
+      random.spread(
+        (seed, size) =>
+          function* (specimenTree) {
+            // If it's already been rejected, don't try and expand the sequence to find an acceptable value. We might
+            // have even moved on from this seed already if so (and will just be covering the same ground again).
+            if (SpecimenTree.isAccepted(specimenTree) === false) {
+              yield* Production.one(seed, specimenTree);
+              return;
+            }
 
-        yield* specimensReplicatedIndefinitely
-          .map((x) => Production.map(applyFilter(f), x))
-          .takeWhileInclusive(Specimen.isDiscarded);
-      }),
+            // Starting with the current, create an infinite sequence of specimens so we can do our best to find one that
+            // passes the predicate.
+            const specimensReplicatedIndefinitely = Sequence.concat<[Seed, SpecimenTree<T>]>(
+              Sequence.singleton([seed, specimenTree]),
+              random.repeat().run(seed, size),
+            );
+
+            yield* specimensReplicatedIndefinitely
+              .map((p) =>
+                ProducedSpecimenTree.bindTree(p, (x) =>
+                  pred(x) ? SpecimenTree.accepted(x) : SpecimenTree.rejected<T>(),
+                ),
+              )
+              .takeWhileInclusive(([, x]) => SpecimenTree.isAccepted(x) === false);
+          },
+      ),
     );
   }
 
   // About iterating over specimens
 
-  private generateTreeSpecimens(seed: Seed, size: Size, count: number): Sequence<Specimen<RoseTree<T>>> {
+  private generateTreeSpecimens(seed: Seed, size: Size, count: number): Sequence<SpecimenTree<T> | typeof Exhausted> {
     return this.random
       .repeat()
       .run(seed, size)
-      .map(([, specimen]) => specimen)
+      .map(([, tree]) => tree)
       .expand(ExhaustionStrategy.apply(ExhaustionStrategy.followingConsecutiveSkips(10)))
-      .takeWhileInclusive((specimen) => specimen !== Exhausted)
+      .takeWhileInclusive((x) => x !== Exhausted)
       .take(count);
   }
 
-  generateSpecimens(seed: Seed, size: Size, count: number): Sequence<T | typeof Skipped | typeof Exhausted> {
-    return this.generateTreeSpecimens(seed, size, count).map((specimen) =>
-      Specimen.map((x) => RoseTree.outcome(x), specimen),
+  generateTrees(seed: Seed, size: Size, count: number): Sequence<Tree<T>> {
+    const isNotExhausted = <T>(x: T | typeof Exhausted): x is T => x !== Exhausted;
+    const isNotUndefined = <T>(x: T | undefined): x is T => x !== undefined;
+    return this.generateTreeSpecimens(seed, size, count)
+      .filter(isNotExhausted)
+      .map(SpecimenTree.toMaybeTree)
+      .filter(isNotUndefined);
+  }
+
+  generateSpecimens(seed: Seed, size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>> {
+    return this.generateTreeSpecimens(seed, size, count).map((x) =>
+      x === Exhausted ? x : SpecimenTree.specimenOutcome(x),
     );
   }
 
-  generateTrees(seed: Seed, size: Size, count: number): Sequence<RoseTree<T>> {
-    return this.generateTreeSpecimens(seed, size, count).filter(Specimen.isAccepted);
-  }
-
   generate(seed: Seed, size: Size, count: number): Sequence<T> {
-    return this.generateSpecimens(seed, size, count).filter(Specimen.isAccepted);
+    return this.generateTrees(seed, size, count).map(Tree.outcome);
   }
 
-  sampleSpecimens(size: Size, count: number): Sequence<T | typeof Skipped | typeof Exhausted> {
+  sampleSpecimens(size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>> {
     return this.generateSpecimens(Seed.spawn(), size, count);
-  }
-
-  sampleTrees(size: Size, count: number): Sequence<RoseTree<T>> {
-    return this.generateTrees(Seed.spawn(), size, count);
   }
 
   sample(size: Size, count: number): Sequence<T> {
@@ -113,18 +196,19 @@ class SpecimensBuilder<T> implements Specimens<T> {
 }
 
 export namespace Specimens {
-  const singleton = <T>(x: Specimen<RoseTree<T>>): Specimens<T> => new SpecimensBuilder(Random.constant(x));
+  const id = <T>(x: T): T => x;
 
-  export const constant = <T>(x: T): Specimens<T> => singleton(RoseTree.singleton(x));
+  const singleton = <T>(x: SpecimenTree<T>): Specimens<T> => new SpecimensBuilder(Random.constant(x));
 
-  export const exhausted = <T>(): Specimens<T> => singleton(Exhausted);
+  export const constant = <T>(x: T): Specimens<T> =>
+    singleton(SpecimenTree.unfold(Specimen.accepted, Shrink.none(), x));
 
-  export const create = <T>(f: RandomF<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> => {
-    const toTree = (x: T): RoseTree<T> => RoseTree.unfold(id, shrinker, x);
-    return new SpecimensBuilder<T>(Random.from(f).map(toTree));
-  };
+  export const rejected = <T>(): Specimens<T> => singleton(SpecimenTree.rejected());
 
-  export const createUnshrinkable = <T>(f: RandomF<T>): Specimens<T> => create(f, () => Sequence.empty());
+  export const create = <T>(f: RandomF<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> =>
+    new SpecimensBuilder<T>(Random.from(f).map((x) => SpecimenTree.unfold(Specimen.accepted, shrinker, x)));
+
+  export const createUnshrinkable = <T>(f: RandomF<T>): Specimens<T> => create(f, Shrink.none());
 
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> =>
     create(Random.integral(numeric, range).toFunction(), Shrink.towards(numeric, range.origin));
@@ -133,7 +217,7 @@ export namespace Specimens {
 
   export const item = <T>(arr: Array<T>): Specimens<T> => {
     if (arr.length === 0) {
-      return exhausted();
+      return rejected();
     }
 
     const range = IntegerRange.constant(0, arr.length - 1);
@@ -141,5 +225,9 @@ export namespace Specimens {
   };
 
   export const zip = <T1, T2>(s1: Specimens<T1>, s2: Specimens<T2>): Specimens<[T1, T2]> =>
-    s1.bind((t1) => s2.map((t2) => [t1, t2]));
+    s1.bind((t1) =>
+      s2.map((t2) => {
+        return [t1, t2];
+      }),
+    );
 }

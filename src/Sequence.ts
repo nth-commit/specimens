@@ -1,4 +1,4 @@
-import { IterableX, generate, from, of, empty, concat, toArray } from 'ix/iterable';
+import { IterableX, generate, from, of, empty, concat, toArray, count } from 'ix/iterable';
 import { skip, take, map, filter, flatMap, takeWhile, takeLast } from 'ix/iterable/operators';
 import { OperatorFunction } from 'ix/interfaces';
 
@@ -85,6 +85,10 @@ export class Sequence<T> implements Iterable<T> {
   }
 
   constructor(private iterable: IterableX<T>) {}
+
+  count(): number {
+    return count(this.iterable);
+  }
 
   skip(n: number): Sequence<T> {
     return new Sequence<T>(this.iterable.pipe(skip(n)));
