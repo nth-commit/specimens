@@ -1,4 +1,4 @@
-import { IterableX, generate, from, of, empty, concat, toArray, count } from 'ix/iterable';
+import { IterableX, generate, from, of, empty, concat, toArray, count, reduce, first } from 'ix/iterable';
 import { skip, take, map, filter, flatMap, takeWhile, takeLast } from 'ix/iterable/operators';
 import { OperatorFunction } from 'ix/interfaces';
 
@@ -32,6 +32,8 @@ export function takeWhileInclusive<T>(predicate: (value: T, index: number) => bo
     return new TakeWhileInclusiveIterable<T>(source, predicate);
   };
 }
+
+export const ExhaustedSequence = Symbol('NullItem');
 
 export class Sequence<T> implements Iterable<T> {
   static infinite(): Sequence<bigint> {
@@ -103,15 +105,7 @@ export class Sequence<T> implements Iterable<T> {
   }
 
   first(): T | undefined {
-    for (const x of this.take(1)) {
-      return x;
-    }
-  }
-
-  last(): T | undefined {
-    for (const x of this.takeLast(1)) {
-      return x;
-    }
+    return first(this.iterable);
   }
 
   takeWhile<U extends T>(pred: (value: T) => value is U): Sequence<U>;
@@ -144,6 +138,10 @@ export class Sequence<T> implements Iterable<T> {
 
   toArray(): Array<T> {
     return toArray(this.iterable);
+  }
+
+  reduce<U>(accumulator: (previousValue: U, currentValue: T, currentIndex: number) => U, seed: U) {
+    return reduce(this.iterable, accumulator, seed);
   }
 
   tap(f: (x: T) => void): Sequence<T> {

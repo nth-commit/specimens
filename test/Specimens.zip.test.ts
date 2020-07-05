@@ -8,14 +8,14 @@ describe('Specimens.zip', () => {
     const specimensZipped = Specimens.zip(specimensLeft, Specimens.constant(0));
 
     const seed = Seed.create(0);
-    const zippedResults = generateTrees(specimensZipped, seed, 10);
-    const leftResults = generateTrees(specimensLeft, seed, 10);
+    const zippedResults = generateTrees(specimensZipped, seed, 1);
+    const leftResults = generateTrees(specimensLeft, seed, 1);
 
     const leftResultsOfZip = zippedResults.map((tree) => EvaluatedTree.map(tree, ([left]) => left));
     expect(leftResultsOfZip).toEqual(leftResults);
   });
 
-  test.skip('It has equivalency with its right component', () => {
+  test('It has equivalency with its right component', () => {
     const specimensRight = Specimens.integer(IntegerRange.constant(1, 10));
     const specimensZipped = Specimens.zip(Specimens.constant(0), specimensRight);
 

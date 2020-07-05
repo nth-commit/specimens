@@ -1,4 +1,4 @@
-import { Seed, Specimens, MaybeExhaustedSpecimen, RoseTree as Tree } from '../src';
+import { Seed, Specimens, RoseTree as Tree, MaybeExhaustedSpecimen } from '../src';
 
 export type EvaluatedTree<T> = [T, Array<EvaluatedTree<T>>];
 
@@ -60,6 +60,15 @@ export const sampleSpecimens = <T>(
   size: number = DEFAULT_SIZE,
 ): Array<MaybeExhaustedSpecimen<T>> => Array.from(specimens.sampleSpecimens(size, count));
 
+export const sampleTrees = <T>(
+  specimens: Specimens<T>,
+  count: number,
+  size: number = DEFAULT_SIZE,
+): Array<EvaluatedTree<T>> => Array.from(specimens.sampleTrees(size, count).map(RoseTreeExtensions.evaluate));
+
+export const sampleOneTree = <T>(specimens: Specimens<T>, size: number = DEFAULT_SIZE): EvaluatedTree<T> =>
+  sampleTrees(specimens, 1, size)[0];
+
 export const generate = <T>(specimens: Specimens<T>, seed: Seed, count: number, size: number = DEFAULT_SIZE): T[] =>
   Array.from(specimens.generate(seed, size, count));
 
@@ -85,3 +94,5 @@ export const generateOneTree = <T>(
   seed: Seed,
   size: number = DEFAULT_SIZE,
 ): EvaluatedTree<T> => generateTrees(specimens, seed, 1, size)[0];
+
+export const someSeedingIntegers = (): number[] => [...Array(10).keys()];

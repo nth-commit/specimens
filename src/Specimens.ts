@@ -1,5 +1,5 @@
 import Numeric, { Integer } from './Numeric';
-import { Random, Production, RandomF } from './Random';
+import { Random, Production } from './Random';
 import Sequence from './Sequence';
 import Range, { Size, IntegerRange } from './Range';
 import Shrink from './Shrink';
@@ -16,30 +16,6 @@ type ProducedSpecimenTree<T> = Production<SpecimenTree<T>>;
 namespace ProducedSpecimenTree {
   export const bindTree = <T, U>(p: ProducedSpecimenTree<T>, k: (x: T) => SpecimenTree<U>): ProducedSpecimenTree<U> =>
     Production.map(p, (t) => SpecimenTree.bind(t, k));
-
-  export const bindSpecimen = <T, U>(p: ProducedSpecimenTree<T>, k: (x: T) => Specimen<U>): ProducedSpecimenTree<U> =>
-    Production.map(p, (t) => SpecimenTree.bindSpecimen(t, k));
-
-  export const bind = <T, U>(
-    [seed, specimenTree]: ProducedSpecimenTree<T>,
-    k: (x: T) => ProducedSpecimenTree<U>,
-  ): ProducedSpecimenTree<U> => {
-    const specimenTree0 = SpecimenTree.map(specimenTree, k);
-
-    // TODO: Fold over tree!
-
-    const f = (s: Specimen<ProducedSpecimenTree<U>>): ProducedSpecimenTree<U> => {
-      return null as any;
-    };
-
-    const result: ProducedSpecimenTree<U> = SpecimenTree.fold(
-      specimenTree0,
-      (specimenOfT, x): ProducedSpecimenTree<U> => specimenOfT as any,
-      (x) => x,
-    );
-
-    return result;
-  };
 }
 
 export type Specimens<T> = {
@@ -51,20 +27,9 @@ export type Specimens<T> = {
   generateTrees(seed: Seed, size: Size, count: number): Sequence<Tree<T>>;
   generate(seed: Seed, size: Size, count: number): Sequence<T>;
   sampleSpecimens(size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>>;
+  sampleTrees(size: Size, count: number): Sequence<Tree<T>>;
   sample(size: Size, count: number): Sequence<T>;
 };
-
-const mapRandomSpecimenTree = <T, U>(r: Random<Tree<Specimen<T>>>, f: (x: T) => U): Random<Tree<Specimen<U>>> =>
-  r.map((t) => SpecimenTree.map(t, f));
-
-type EnumeratedTree<T> = [T, Array<EnumeratedTree<T>>];
-
-const enumerateTree = <T>([outcome, shrinks]: Tree<T>): EnumeratedTree<T> => [
-  outcome,
-  shrinks.map(enumerateTree).toArray(),
-];
-
-const serializeEnumerateTree = <T>(tree: Tree<T>): string => JSON.stringify(enumerateTree(tree), null, 2);
 
 class SpecimensBuilder<T> implements Specimens<T> {
   constructor(readonly random: Random<SpecimenTree<T>>) {}
@@ -76,51 +41,48 @@ class SpecimensBuilder<T> implements Specimens<T> {
   // About transforming specimens
 
   map<U>(f: (x: T) => U): Specimens<U> {
-    return new SpecimensBuilder<U>(mapRandomSpecimenTree(this.random, f));
+    return new SpecimensBuilder<U>(this.random.map((specimenTree) => SpecimenTree.map(specimenTree, f)));
   }
 
   bind<U>(f: (x: T) => Specimens<U>): Specimens<U> {
-    const r1 = Random.from((seed, size) => {
-      let currentSeed = seed;
-      const run = <V>(specimens: Specimens<V>) => {
-        return specimens
-          .run(currentSeed, size)
-          .tap(([s]) => {
-            currentSeed = s;
-          })
-          .map(([, x]) => x);
-      };
+    const r = this.random.spread(
+      (seed, size) =>
+        function* (specimenTree) {
+          if (SpecimenTree.isAccepted(specimenTree) === false) {
+            yield* Production.one(seed, SpecimenTree.rejected<U>());
+            return;
+          }
 
-      const left = run(this).toArray();
+          let currentSeed = seed;
+          const run = <V>(specimens: Specimens<V>) => {
+            return specimens
+              .run(currentSeed, size)
+              .tap(([s]) => {
+                currentSeed = s;
+              })
+              .map(([, x]) => x);
+          };
 
-      switch (left.length) {
-        case 0:
-          return Production.one(seed, SpecimenTree.rejected<U>());
-        case 1:
-          break;
-        default:
-          throw new Error('Binding specimens of length > 1 is not supported yet');
-      }
+          const specimenTree0 = SpecimenTree.bind<T, U>(specimenTree, (x) => {
+            const specimenTrees = run(f(x));
 
-      const result = Sequence.from(left)
-        .map((specimenTree1) => {
-          const specimenTree2 = SpecimenTree.bind(specimenTree1, (x) => {
-            return run(f(x)).first()!;
+            const specimenTree1 = specimenTrees.first();
+            if (specimenTree1 === undefined) {
+              throw 'TODO: Handle empty bound sequence';
+            }
+
+            if (specimenTrees.first()) {
+              throw 'TODO: Handle sequences > 1';
+            }
+
+            return specimenTree1;
           });
 
-          return specimenTree2;
-        })
-        .map((specimenTree) => [currentSeed, specimenTree] as ProducedSpecimenTree<U>);
+          yield* Production.one(currentSeed, specimenTree0);
+        },
+    );
 
-      const debug1 = result
-        .toArray()
-        .map(([, x]) => serializeEnumerateTree(x))
-        .join('\\n');
-
-      return result;
-    });
-
-    return new SpecimensBuilder<U>(r1);
+    return new SpecimensBuilder<U>(r);
   }
 
   filter(pred: (x: T) => boolean): Specimens<T> {
@@ -186,6 +148,10 @@ class SpecimensBuilder<T> implements Specimens<T> {
     return this.generateTrees(seed, size, count).map(Tree.outcome);
   }
 
+  sampleTrees(size: Size, count: number): Sequence<Tree<T>> {
+    return this.generateTrees(Seed.spawn(), size, count);
+  }
+
   sampleSpecimens(size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>> {
     return this.generateSpecimens(Seed.spawn(), size, count);
   }
@@ -196,22 +162,20 @@ class SpecimensBuilder<T> implements Specimens<T> {
 }
 
 export namespace Specimens {
-  const id = <T>(x: T): T => x;
-
   const singleton = <T>(x: SpecimenTree<T>): Specimens<T> => new SpecimensBuilder(Random.constant(x));
+
+  export const rejected = <T>(): Specimens<T> => singleton(SpecimenTree.rejected());
+
+  export const create = <T>(r: Random<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> =>
+    new SpecimensBuilder<T>(r.map((x) => SpecimenTree.unfold(Specimen.accepted, shrinker, x)));
 
   export const constant = <T>(x: T): Specimens<T> =>
     singleton(SpecimenTree.unfold(Specimen.accepted, Shrink.none(), x));
 
-  export const rejected = <T>(): Specimens<T> => singleton(SpecimenTree.rejected());
-
-  export const create = <T>(f: RandomF<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> =>
-    new SpecimensBuilder<T>(Random.from(f).map((x) => SpecimenTree.unfold(Specimen.accepted, shrinker, x)));
-
-  export const createUnshrinkable = <T>(f: RandomF<T>): Specimens<T> => create(f, Shrink.none());
+  export const infinite = <T>(x: T): Specimens<T> => create(Random.infinite(x), Shrink.none());
 
   export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> =>
-    create(Random.integral(numeric, range).toFunction(), Shrink.towards(numeric, range.origin));
+    create(Random.integral(numeric, range), Shrink.towards(numeric, range.origin));
 
   export const integer = (range: Range<number>): Specimens<number> => integral(Integer, range);
 

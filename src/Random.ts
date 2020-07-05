@@ -86,4 +86,7 @@ export namespace Random {
     });
 
   export const from = <T>(f: RandomF<T>): Random<T> => new RandomBuilder(f);
+
+  export const infinite = <U>(x: U): Random<U> =>
+    from((seed) => Sequence.infinite().bind(() => Production.one(seed, x)));
 }

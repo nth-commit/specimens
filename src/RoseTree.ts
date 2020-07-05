@@ -48,20 +48,20 @@ export namespace RoseTree {
     return g(x).map((y) => unfold(f, g, y));
   }
 
-  export function fold<Node, FoldedNode, FoldedForest>(
+  export function fold<Node, FoldedTree, FoldedForest>(
     [x, xs]: RoseTree<Node>,
-    f: (a: Node, x: FoldedForest) => FoldedNode,
-    g: (xs: Sequence<FoldedNode>) => FoldedForest,
-  ): FoldedNode {
-    return f(x, foldForest(xs, f, g));
+    treeFolder: (a: Node, x: FoldedForest) => FoldedTree,
+    forestFolder: (xs: Sequence<FoldedTree>) => FoldedForest,
+  ): FoldedTree {
+    return treeFolder(x, foldForest(xs, treeFolder, forestFolder));
   }
 
-  export function foldForest<Node, FoldedNode, FoldedForest>(
+  export function foldForest<Node, FoldedTree, FoldedForest>(
     forest: Sequence<RoseTree<Node>>,
-    f: (a: Node, x: FoldedForest) => FoldedNode,
-    g: (xs: Sequence<FoldedNode>) => FoldedForest,
+    treeFolder: (a: Node, x: FoldedForest) => FoldedTree,
+    forestFolder: (xs: Sequence<FoldedTree>) => FoldedForest,
   ): FoldedForest {
-    return g(forest.map((x) => fold(x, f, g)));
+    return forestFolder(forest.map((x) => fold(x, treeFolder, forestFolder)));
   }
 
   export const bind = <T, U>([x, xs]: RoseTree<T>, f: (x: T) => RoseTree<U>): RoseTree<U> => {
