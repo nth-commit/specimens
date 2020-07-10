@@ -1,4 +1,4 @@
-import { Seed, Specimens, RoseTree as Tree, MaybeExhaustedSpecimen } from '../src';
+import { Seed, Specimens, Tree, MaybeExhaustedSpecimen } from '../src';
 
 export type EvaluatedTree<T> = [T, Array<EvaluatedTree<T>>];
 
@@ -38,7 +38,7 @@ export namespace EvaluatedTree {
   };
 }
 
-export namespace RoseTreeExtensions {
+export namespace TreeExtensions {
   export const evaluate = <T>([outcome, shrinks]: Tree<T>): EvaluatedTree<T> => {
     const evaluatedShrinks = shrinks.map(evaluate).toArray();
     return [outcome, evaluatedShrinks];
@@ -64,7 +64,7 @@ export const sampleTrees = <T>(
   specimens: Specimens<T>,
   count: number,
   size: number = DEFAULT_SIZE,
-): Array<EvaluatedTree<T>> => Array.from(specimens.sampleTrees(size, count).map(RoseTreeExtensions.evaluate));
+): Array<EvaluatedTree<T>> => Array.from(specimens.sampleTrees(size, count).map(TreeExtensions.evaluate));
 
 export const sampleOneTree = <T>(specimens: Specimens<T>, size: number = DEFAULT_SIZE): EvaluatedTree<T> =>
   sampleTrees(specimens, 1, size)[0];
@@ -87,7 +87,7 @@ export const generateTrees = <T>(
   seed: Seed,
   count: number,
   size: number = DEFAULT_SIZE,
-): Array<EvaluatedTree<T>> => Array.from(specimens.generateTrees(seed, size, count).map(RoseTreeExtensions.evaluate));
+): Array<EvaluatedTree<T>> => Array.from(specimens.generateTrees(seed, size, count).map(TreeExtensions.evaluate));
 
 export const generateOneTree = <T>(
   specimens: Specimens<T>,
@@ -96,3 +96,19 @@ export const generateOneTree = <T>(
 ): EvaluatedTree<T> => generateTrees(specimens, seed, 1, size)[0];
 
 export const someSeedingIntegers = (): number[] => [...Array(10).keys()];
+
+export namespace SeedMock {
+  export const constant = (x: number): Seed => ({
+    nextInt: () => x,
+    split: () => [constant(x), constant(x)],
+  });
+
+  export const from = (xs: number[]): Seed => ({
+    nextInt: () => {
+      const x = xs[0];
+      if (x === undefined) throw 'Exhausted';
+      return x;
+    },
+    split: () => [from(xs), from(xs.slice(1))],
+  });
+}

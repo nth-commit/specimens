@@ -1,17 +1,16 @@
 import { Specimen } from './Specimen';
-import { RoseTree as Tree } from './RoseTree';
-import { SpecimenTree } from './SpecimenTree';
+import { Tree } from './Tree';
 
 export const Exhausted = Symbol('Exhausted');
 
 export type ExhaustionStrategy = {
-  recognize: <T>(s: SpecimenTree<T>) => void;
+  recognize: <T>(s: Specimen<Tree<T>>) => void;
   isExhausted: () => boolean;
 };
 
 export namespace ExhaustionStrategy {
   export const apply = <T>(exhaustionStrategy: ExhaustionStrategy) =>
-    function* (specimen: SpecimenTree<T>): Generator<SpecimenTree<T> | typeof Exhausted> {
+    function* (specimen: Specimen<Tree<T>>): Generator<Specimen<Tree<T>> | typeof Exhausted> {
       if (exhaustionStrategy.isExhausted()) {
         throw 'Error: Attempted to take from exhausted specimens';
       }
@@ -27,8 +26,8 @@ export namespace ExhaustionStrategy {
   export const followingConsecutiveSkips = (maxNumberOfSkips: number): ExhaustionStrategy => {
     let rejectionCount = 0;
     return {
-      recognize: (t) => {
-        if (SpecimenTree.isRejected(t)) {
+      recognize: (x) => {
+        if (Specimen.isRejected(x)) {
           rejectionCount++;
         } else {
           rejectionCount = 0;

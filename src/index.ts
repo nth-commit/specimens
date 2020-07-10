@@ -3,7 +3,7 @@ export * from './Specimen';
 export * from './Numeric';
 export * from './Random';
 export * from './Range';
-export * from './RoseTree';
+export * from './Tree';
 export * from './Seed';
 export * from './Sequence';
 export * from './Shrink';

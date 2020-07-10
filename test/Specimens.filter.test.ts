@@ -1,8 +1,6 @@
 import { IntegerRange, Seed } from '../src';
 import { Specimens, Exhausted } from '../src';
-import { setDifference, EvaluatedTree, sampleSpecimens, sample, generateOneTree, generateSpecimens } from './Util';
-
-const someSeedingIntegers = (): number[] => [...Array(10).keys()];
+import { setDifference, EvaluatedTree, sampleSpecimens, sample, generateOneTree } from './Util';
 
 describe('Specimens.filter', () => {
   test('It exhausts with an impossible predicate', () => {
@@ -39,31 +37,5 @@ describe('Specimens.filter', () => {
     const tree = generateOneTree(specimens, seed, 1);
 
     expect(EvaluatedTree.shrinks(tree).map(EvaluatedTree.outcome)).toEqual([5]);
-  });
-
-  test.each(someSeedingIntegers())('It is distributable', (seeder) => {
-    const predicateA = (x: number): boolean => x % 2 === 0;
-    const predicateB = (x: number): boolean => x % 3 === 0;
-    const specimens = Specimens.integer(IntegerRange.constant(1, 6));
-
-    const seed = Seed.create(seeder);
-    const run = (specimens: Specimens<number>) => generateSpecimens(specimens, seed, 100);
-
-    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
-      run(specimens.filter((x) => predicateA(x) && predicateB(x))),
-    );
-  });
-
-  test.each(someSeedingIntegers())('It is commutative', (seeder) => {
-    const predicateA = (x: number): boolean => x % 2 === 0;
-    const predicateB = (x: number): boolean => x % 3 === 0;
-    const specimens = Specimens.integer(IntegerRange.constant(1, 6));
-
-    const seed = Seed.create(seeder);
-    const run = (specimens: Specimens<number>) => generateSpecimens(specimens, seed, 100);
-
-    expect(run(specimens.filter(predicateA).filter(predicateB))).toEqual(
-      run(specimens.filter(predicateB).filter(predicateA)),
-    );
   });
 });

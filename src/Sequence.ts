@@ -140,6 +140,11 @@ export class Sequence<T> implements Iterable<T> {
     return toArray(this.iterable);
   }
 
+  copyToArray(): [Array<T>, Sequence<T>] {
+    const array = this.toArray();
+    return [array, Sequence.from(array)];
+  }
+
   reduce<U>(accumulator: (previousValue: U, currentValue: T, currentIndex: number) => U, seed: U) {
     return reduce(this.iterable, accumulator, seed);
   }

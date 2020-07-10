@@ -1,12 +1,5 @@
-import { Specimens, IntegerRange, Seed, Exhausted, Random, Shrink, Specimen } from '../src';
-import { sample, generateOneTree, EvaluatedTree, sampleOneTree, someSeedingIntegers, sampleSpecimens } from './Util';
-
-namespace SeedMock {
-  export const alwaysReturns = (nextInt: number): Seed => ({
-    nextInt: () => nextInt,
-    split: () => [alwaysReturns(nextInt), alwaysReturns(nextInt)],
-  });
-}
+import { Specimens, IntegerRange, Seed, Exhausted, Specimen } from '../src';
+import { sample, generateOneTree, EvaluatedTree, sampleSpecimens, SeedMock } from './Util';
 
 describe('Specimens.bind', () => {
   test('Exhausts if original specimen is exhausted', () => {
@@ -56,7 +49,8 @@ describe('Specimens.bind', () => {
     const specimens = Specimens.integer(IntegerRange.constant(0, 10));
     const specimens0 = specimens.bind(k);
 
-    const seed = Seed.spawn();
+    // const seed = Seed.spawn();
+    const seed = SeedMock.constant(6);
     const unboundTree = generateOneTree(specimens, seed);
     const boundTree = generateOneTree(specimens0, seed);
 
