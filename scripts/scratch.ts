@@ -1,5 +1,5 @@
-import { IntegerRange, Seed, Shrink, Integer, Sequence, Specimens } from '../src';
-import { generateSpecimens } from '../test/Util';
+import { IntegerRange, Seed, Shrink, Integer, Sequence, Specimens, Tree } from '../src';
+import { generateSpecimens, EvaluatedTree, TreeExtensions } from '../test/Util';
 
 const loggingSeedDecorator = (seed: Seed, idPath: Array<'L' | 'R'> = []): Seed => {
   const id = idPath.join(':');
@@ -22,16 +22,24 @@ const loggingSeedDecorator = (seed: Seed, idPath: Array<'L' | 'R'> = []): Seed =
   } as Seed;
 };
 
-const predicateA = (x: number): boolean => x % 2 === 0;
-const predicateB = (x: number): boolean => x % 3 === 0;
-const specimens = Specimens.integer(IntegerRange.constant(1, 6));
+// const seed = loggingSeedDecorator(Seed.create(3));
 
-const seed = loggingSeedDecorator(Seed.create(3));
-// const test = generateSpecimens(specimens, seed, 10);
-// console.log(test);
+const s = Specimens.unfold([0, 0], ([, count]) =>
+  count > 50
+    ? Specimens.rejected()
+    : Specimens.integer(IntegerRange.constant(0, 10))
+        .noShrink()
+        .map((x) => [x, x + count]),
+);
 
-// const test2 = generateSpecimens(specimens.filter(predicateA).filter(predicateB), seed, 10);
-// console.log(test2);
+const seed = Seed.spawn();
 
-const test3 = generateSpecimens(specimens.filter(predicateB).filter(predicateA), seed, 6);
-console.log(test3);
+for (const x of s.generateTrees(seed, 30, 20)) {
+  console.log(JSON.stringify(EvaluatedTree.simplify(TreeExtensions.evaluate(x)), null, 2));
+}
+
+console.log('Values!');
+
+for (const x of Specimens.integer(IntegerRange.constant(0, 10)).generate(seed, 30, 20)) {
+  console.log(x);
+}

@@ -15,6 +15,7 @@ export type Specimens<T> = {
   map<U>(f: (x: T) => U): Specimens<U>;
   bind<U>(f: (x: T) => Specimens<U>): Specimens<U>;
   filter(pred: (x: T) => boolean): Specimens<T>;
+  noShrink(): Specimens<T>;
   generateSpecimens(seed: Seed, size: Size, count: number): Sequence<MaybeExhaustedSpecimen<T>>;
   generateTrees(seed: Seed, size: Size, count: number): Sequence<Tree<T>>;
   generate(seed: Seed, size: Size, count: number): Sequence<T>;
@@ -89,6 +90,12 @@ class SpecimensBuilder<T> implements Specimens<T> {
     );
   }
 
+  noShrink(): Specimens<T> {
+    return new SpecimensBuilder<T>(
+      this.random.map((treeSpecimen) => Specimen.map(treeSpecimen, ([x]) => Tree.singleton(x))),
+    );
+  }
+
   // About iterating over specimens
 
   private generateTreeSpecimens(seed: Seed, size: Size, count: number): Sequence<MaybeExhaustedSpecimen<Tree<T>>> {
@@ -160,4 +167,18 @@ export namespace Specimens {
 
   export const zip = <T1, T2>(sx: Specimens<T1>, sy: Specimens<T2>): Specimens<[T1, T2]> =>
     map2(sx, sy, (x, y) => [x, y]);
+
+  export const concat = <T>(sx: Specimens<T>, sy: Specimens<T>): Specimens<T> =>
+    new SpecimensBuilder(
+      Random.from((seed, size) => {
+        const [leftSeed, rightSeed] = seed.split();
+        return Sequence.fromGenerator(function* () {
+          yield* sx.run(leftSeed, size);
+          yield* sy.run(rightSeed, size);
+        });
+      }),
+    );
+
+  export const unfold = <T>(init: T, generator: (prev: T) => Specimens<T>): Specimens<T> =>
+    generator(init).bind((x) => concat(Specimens.constant(x), unfold(x, generator)));
 }
