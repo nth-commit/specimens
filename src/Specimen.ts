@@ -17,6 +17,10 @@ export namespace Specimen {
   export const isRejected = <T>(s: Specimen<T>): s is RejectedSpecimen => s.kind === 'rejected';
 
   export const getValue = <T>(s: AcceptedSpecimen<T>): T => s.value;
+  export const getValueUnsafe = <T>(s: Specimen<T>): T => {
+    if (s.kind === 'rejected') throw 'Expected accepted';
+    return getValue(s);
+  };
 
   export const map = <T, U>(s: Specimen<T>, f: (x: T) => U): Specimen<U> => (isAccepted(s) ? accepted(f(s.value)) : s);
 

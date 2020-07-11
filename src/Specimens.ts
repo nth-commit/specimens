@@ -179,6 +179,12 @@ export namespace Specimens {
       }),
     );
 
-  export const unfold = <T>(init: T, generator: (prev: T) => Specimens<T>): Specimens<T> =>
-    generator(init).bind((x) => concat(Specimens.constant(x), unfold(x, generator)));
+  export const unfold = <T>(initial: T, generator: (prev: T) => Specimens<T>): Specimens<T> =>
+    generator(initial).bind((x) => concat(constant(x), unfold(x, generator)));
+
+  export const stateMachine = <State, Action>(
+    initialState: State,
+    transition: (s: State, a: Action) => State,
+    generateAction: (s: State) => Specimens<Action>,
+  ): Specimens<State> => unfold<State>(initialState, (s) => generateAction(s).map((a) => transition(s, a)));
 }
