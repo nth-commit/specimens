@@ -12,18 +12,20 @@ type TodoState = {
   text: string;
 };
 
-type TodoListState =
-  | {
-      type: 'ok';
-      todoOrder: string[];
-      todosById: Record<string, TodoState>;
-    }
-  | {
-      type: 'fail';
-      reason: string;
-      state: TodoListState;
-      invalidAction: TodoListAction;
-    };
+type TodoListOkState = {
+  type: 'ok';
+  todoOrder: string[];
+  todosById: Record<string, TodoState>;
+};
+
+type TodoListErrorState = {
+  type: 'fail';
+  reason: string;
+  state: TodoListState;
+  invalidAction: TodoListAction;
+};
+
+type TodoListState = TodoListOkState | TodoListErrorState;
 
 const INITIAL_STATE: TodoListState = {
   type: 'ok',
@@ -161,63 +163,40 @@ describe('Specimens.stateMachine', () => {
     });
   });
 
-  type TodoListActionGenerators = {
-    [Type in TodoListAction['type']]: (state: TodoListState) => Specimens<TodoListAction> | undefined;
-  };
+  const terminateIfFailedOr = (
+    continueWith: (s: TodoListOkState) => Specimens.ActionSpecimenDefinitionResult<TodoListAction>,
+  ) => (state: TodoListState): Specimens.ActionSpecimenDefinitionResult<TodoListAction> =>
+    state.type === 'fail' ? Specimens.Terminated : continueWith(state);
 
-  const generateTodoAction = (state: TodoListState): Specimens<TodoListAction> => {
-    if (state.type === 'fail') {
-      return Specimens.rejected();
-    }
-
-    // Signals:
-    //    Terminated
-    //    InvalidTransition
-
-    const generators: TodoListActionGenerators = {
-      add: (state) =>
-        state.type === 'fail'
-          ? Specimens.rejected()
-          : Specimens.integer(IntegerRange.constant(0, 9999))
-              .map((id) => id.toString())
-              .filter((id) => state.todoOrder.includes(id) === false)
-              .map<TodoListAction>((id) => ({ type: 'add', text: '', id })),
-      delete: (state) =>
-        state.type === 'fail'
-          ? Specimens.rejected()
-          : state.todoOrder.length === 0
-          ? undefined
-          : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
-      toggle: (state) =>
-        state.type === 'fail'
-          ? Specimens.rejected()
-          : state.todoOrder.length === 0
-          ? undefined
-          : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
-      move: (state) =>
-        state.type === 'fail'
-          ? Specimens.rejected()
-          : state.todoOrder.length === 0
-          ? undefined
-          : Specimens.zip(
-              Specimens.item(state.todoOrder),
-              Specimens.integer(IntegerRange.constant(0, state.todoOrder.length - 1)),
-            ).map<TodoListAction>(([id, toIndex]) => ({ type: 'move', id, toIndex })),
-    };
-
-    const isNotUndefined = <T>(x: T | undefined): x is T => x !== undefined;
-
-    const definedGenerators = Object.values(generators)
-      .map((g) => g(state))
-      .filter(isNotUndefined);
-
-    return Specimens.item(definedGenerators).bind((x) => x);
-  };
+  const reducerSpecimens = Specimens.fromReducer(INITIAL_STATE, todoListReducer, {
+    add: terminateIfFailedOr((state) =>
+      Specimens.integer(IntegerRange.constant(0, 9999))
+        .map((id) => id.toString())
+        .filter((id) => state.todoOrder.includes(id) === false)
+        .map<TodoListAction>((id) => ({ type: 'add', text: '', id })),
+    ),
+    delete: terminateIfFailedOr((state) =>
+      state.todoOrder.length === 0
+        ? Specimens.InvalidTransition
+        : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
+    ),
+    toggle: terminateIfFailedOr((state) =>
+      state.todoOrder.length === 0
+        ? Specimens.InvalidTransition
+        : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
+    ),
+    move: terminateIfFailedOr((state) =>
+      state.todoOrder.length === 0
+        ? Specimens.InvalidTransition
+        : Specimens.zip(
+            Specimens.item(state.todoOrder),
+            Specimens.integer(IntegerRange.constant(0, state.todoOrder.length - 1)),
+          ).map<TodoListAction>(([id, toIndex]) => ({ type: 'move', id, toIndex })),
+    ),
+  });
 
   test('I can create state machine specimens that avoids a failure state', () => {
-    const stateMachineSpecimens = Specimens.stateMachine(INITIAL_STATE, todoListReducer, generateTodoAction);
-
-    const specimens = generateSpecimens(stateMachineSpecimens, Seed.spawn(), 100);
+    const specimens = generateSpecimens(reducerSpecimens, Seed.spawn(), 100);
 
     expect(specimens).toHaveLength(100);
     specimens.forEach((specimen) => {
