@@ -23,7 +23,7 @@ export const integral = <N>(numeric: Numeric<N>, range: Range<N>): S<N> =>
 
 export const integer = (range: Range<number>): S<number> => integral(integerNumeric, range);
 
-export const item = <T>(arr: Array<T>): S<T> => {
+export const pickElement = <T>(arr: Array<T>): S<T> => {
   if (arr.length === 0) {
     return rejected();
   }
@@ -31,3 +31,5 @@ export const item = <T>(arr: Array<T>): S<T> => {
   const range = Range.constant(0, arr.length - 1);
   return integer(range).map((ix) => arr[ix]);
 };
+
+export const pickSpecimens = <T>(arr: Array<S<T>>): S<T> => pickElement(arr).bind(id);

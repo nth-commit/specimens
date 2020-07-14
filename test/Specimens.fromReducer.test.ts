@@ -1,6 +1,6 @@
 import { Seed, Exhausted, Specimen, Range } from '../src';
 import * as S from '../src/Specimens';
-import { generateSpecimens } from './Util';
+import { generateSpecimens, generate } from './Util';
 
 type TodoListAction =
   | { type: 'add'; id: string; text: string }
@@ -164,9 +164,9 @@ describe('Specimens.stateMachine', () => {
     });
   });
 
-  const terminateIfFailedOr = (continueWith: (s: TodoListOkState) => S.ReducerTransition<TodoListAction>) => (
+  const terminateIfFailedOr = (continueWith: (s: TodoListOkState) => S.TryTransitionReducer<TodoListAction>) => (
     state: TodoListState,
-  ): S.ReducerTransition<TodoListAction> => (state.type === 'fail' ? S.Terminated : continueWith(state));
+  ): S.TryTransitionReducer<TodoListAction> => (state.type === 'fail' ? S.ReducerMustTerminate : continueWith(state));
 
   const reducerSpecimens = S.fromReducer(INITIAL_STATE, todoListReducer, {
     add: terminateIfFailedOr((state) =>
@@ -177,31 +177,35 @@ describe('Specimens.stateMachine', () => {
     ),
     delete: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? S.InvalidTransition
-        : S.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
+        ? S.ActionNotApplicable
+        : S.pickElement(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
     ),
     toggle: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? S.InvalidTransition
-        : S.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
+        ? S.ActionNotApplicable
+        : S.pickElement(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
     ),
     move: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? S.InvalidTransition
-        : S.zip(S.item(state.todoOrder), S.integer(Range.constant(0, state.todoOrder.length - 1))).map<TodoListAction>(
-            ([id, toIndex]) => ({ type: 'move', id, toIndex }),
-          ),
+        ? S.ActionNotApplicable
+        : S.zip(S.pickElement(state.todoOrder), S.integer(Range.constant(0, state.todoOrder.length - 1))).map<
+            TodoListAction
+          >(([id, toIndex]) => ({ type: 'move', id, toIndex })),
     ),
   });
 
-  test('I can create state machine specimens that avoids a failure state', () => {
+  test('It is able to produce exclusively accepted specimens', () => {
     const specimens = generateSpecimens(reducerSpecimens, Seed.spawn(), 100);
 
-    expect(specimens).toHaveLength(100);
     specimens.forEach((specimen) => {
-      if (specimen === Exhausted) throw 'Should not exhaust';
-      expect(specimen.kind).toEqual('accepted');
-      expect(Specimen.getValueUnsafe(specimen)).toMatchObject({ type: 'ok' });
+      expect(specimen).not.toEqual(Exhausted);
+      expect(specimen).toHaveProperty('kind', 'accepted');
     });
+  });
+
+  test('It is able to avoid the failure state of the reducer', () => {
+    const results = generate(reducerSpecimens, Seed.spawn(), 100);
+
+    results.forEach((r) => expect(r).toMatchObject({ state: { type: 'ok' } }));
   });
 });
