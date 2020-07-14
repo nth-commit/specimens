@@ -1,5 +1,7 @@
 import * as S from '../src';
 import { generateSpecimens, EvaluatedTree, TreeExtensions } from '../test/Util';
+import { reducerSpecimens } from './todoListReducer';
+import { Seed } from '../src';
 
 const loggingSeedDecorator = (seed: S.Seed, idPath: Array<'L' | 'R'> = []): S.Seed => {
   const id = idPath.join(':');
@@ -24,22 +26,9 @@ const loggingSeedDecorator = (seed: S.Seed, idPath: Array<'L' | 'R'> = []): S.Se
 
 // const seed = loggingSeedDecorator(Seed.create(3));
 
-const s = S.scan([0, 0], ([, count]) =>
-  count > 50
-    ? S.rejected()
-    : S.integer(S.Range.constant(0, 10))
-        .noShrink()
-        .map((x) => [x, x + count]),
-);
+// for (const x of reducerSpecimens.generate(Seed.spawn(), 50, 10)) {
+//   console.log(JSON.stringify(x, null, 2));
+// }
 
-const seed = S.Seed.spawn();
-
-for (const x of s.generateTrees(seed, 30, 20)) {
-  console.log(JSON.stringify(EvaluatedTree.simplify(TreeExtensions.evaluate(x)), null, 2));
-}
-
-console.log('Values!');
-
-for (const x of S.integer(S.Range.constant(0, 10)).generate(seed, 30, 20)) {
-  console.log(x);
-}
+const specimens = S.integer(S.Range.constant(0, 10));
+S.printStatistics(specimens, (s) => s.toString(), { sampleSize: 1000000 });

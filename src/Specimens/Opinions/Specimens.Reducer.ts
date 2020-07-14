@@ -1,11 +1,14 @@
 import { Specimens as S } from '../Specimens';
-import { pickSpecimens } from '../Specimens.Primitives';
+import { WeightedSpecimens, pickSpecimensWeighted } from '../Specimens.Primitives';
 import { fromStateMachine, EventSpecimens } from '../Specimens.Machinery';
 
 export const ReducerMustTerminate = Symbol('Terminated');
 export const ActionNotApplicable = Symbol('InvalidTransition');
 
-export type TryTransitionReducer<Action> = S<Action> | typeof ActionNotApplicable | typeof ReducerMustTerminate;
+export type TryTransitionReducer<Action> =
+  | WeightedSpecimens<Action>
+  | typeof ActionNotApplicable
+  | typeof ReducerMustTerminate;
 
 export type TryPickReducerAction<State, Action> = (state: State) => TryTransitionReducer<Action>;
 
@@ -25,7 +28,7 @@ const makeActionSpecimens = <State, Action extends { type: string }>(
   >;
 
   return (state) =>
-    pickSpecimens(
+    pickSpecimensWeighted(
       tryTransitionReducerDefs
         .map((d) => {
           const maybeActionSpecimen = d(state);

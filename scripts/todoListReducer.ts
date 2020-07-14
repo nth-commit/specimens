@@ -1,6 +1,4 @@
-import { Seed, Exhausted, Specimen, Range } from '../src';
-import * as S from '../src/Specimens';
-import { generateSpecimens, generate } from './Util';
+import * as S from '../src';
 
 type TodoListAction =
   | { type: 'add'; id: string; text: string }
@@ -120,7 +118,7 @@ const terminateIfFailedOr = (continueWith: (s: TodoListOkState) => S.TryTransiti
 export const reducerSpecimens = S.fromReducer(INITIAL_STATE, todoListReducer, {
   add: terminateIfFailedOr((state) => ({
     weight: 5,
-    specimens: S.integer(Range.constant(0, 9999))
+    specimens: S.integer(S.Range.constant(0, 9999))
       .map((id) => id.toString())
       .filter((id) => state.todoOrder.includes(id) === false)
       .map<TodoListAction>((id) => ({ type: 'add', text: '', id })),
@@ -148,75 +146,8 @@ export const reducerSpecimens = S.fromReducer(INITIAL_STATE, todoListReducer, {
           weight: 1,
           specimens: S.zip(
             S.pickElement(state.todoOrder),
-            S.integer(Range.constant(0, state.todoOrder.length - 1)),
+            S.integer(S.Range.constant(0, state.todoOrder.length - 1)),
           ).map<TodoListAction>(([id, toIndex]) => ({ type: 'move', id, toIndex })),
         },
   ),
-});
-
-describe('Specimens.stateMachine', () => {
-  describe('Pre-assertions: todoListReducer', () => {
-    test('Adding an item fails if the ID already exists', () => {
-      const action: TodoListAction = { type: 'add', id: '1', text: '' };
-      const initialState = todoListReducer(INITIAL_STATE, action);
-
-      const state = todoListReducer(initialState, action);
-
-      expect(state).toMatchObject({
-        type: 'fail',
-        reason: 'Duplicate id',
-      });
-    });
-
-    test('Deleting an item fails if an item with that ID does not exist', () => {
-      const action: TodoListAction = { type: 'delete', id: '1' };
-      const initialState = INITIAL_STATE;
-
-      const state = todoListReducer(initialState, action);
-
-      expect(state).toMatchObject({
-        type: 'fail',
-        reason: 'Non-existent id',
-      });
-    });
-
-    test('Toggling an item fails if an item with that ID does not exist', () => {
-      const action: TodoListAction = { type: 'toggle', id: '1' };
-      const initialState = INITIAL_STATE;
-
-      const state = todoListReducer(initialState, action);
-
-      expect(state).toMatchObject({
-        type: 'fail',
-        reason: 'Non-existent id',
-      });
-    });
-
-    test('Moving an item fails if an item with that ID does not exist', () => {
-      const action: TodoListAction = { type: 'move', id: '1', toIndex: 0 };
-      const initialState = INITIAL_STATE;
-
-      const state = todoListReducer(initialState, action);
-
-      expect(state).toMatchObject({
-        type: 'fail',
-        reason: 'Non-existent id',
-      });
-    });
-  });
-
-  test('It is able to produce exclusively accepted specimens', () => {
-    const specimens = generateSpecimens(reducerSpecimens, Seed.spawn(), 100);
-
-    specimens.forEach((specimen) => {
-      expect(specimen).not.toEqual(Exhausted);
-      expect(specimen).toHaveProperty('kind', 'accepted');
-    });
-  });
-
-  test('It is able to avoid the failure state of the reducer', () => {
-    const results = generate(reducerSpecimens, Seed.spawn(), 100);
-
-    results.forEach((r) => expect(r).toMatchObject({ state: { type: 'ok' } }));
-  });
 });

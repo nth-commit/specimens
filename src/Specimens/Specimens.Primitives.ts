@@ -32,4 +32,45 @@ export const pickElement = <T>(arr: Array<T>): S<T> => {
   return integer(range).map((ix) => arr[ix]);
 };
 
-export const pickSpecimens = <T>(arr: Array<S<T>>): S<T> => pickElement(arr).bind(id);
+export const pickSpecimens = <T>(specimens: Array<S<T>>): S<T> => pickElement(specimens).bind(id);
+
+export type WeightedSpecimens<T> = {
+  weight: number;
+  specimens: S<T>;
+};
+
+type ValueAssignedSpecimens<T> = {
+  minValue: number;
+  maxValue: number;
+  specimens: S<T>;
+};
+
+export const pickSpecimensWeighted = <T>(weightedSpecimens: Array<WeightedSpecimens<T>>): S<T> => {
+  if (weightedSpecimens.length === 0) {
+    return rejected();
+  }
+
+  const normalizedWeightedSpecimens = weightedSpecimens.map(({ weight, specimens }) => ({
+    weight: Math.ceil(weight),
+    specimens,
+  }));
+
+  const totalWeight = normalizedWeightedSpecimens.reduce((acc, curr) => acc + curr.weight, 0);
+
+  const valueAssignedSpecimens = normalizedWeightedSpecimens.reduce((acc, curr) => {
+    const last = acc[acc.length - 1];
+    const lastMaxValue = last === undefined ? -1 : last.maxValue;
+    return [
+      ...acc,
+      {
+        minValue: lastMaxValue + 1,
+        maxValue: lastMaxValue + 1 + curr.weight,
+        specimens: curr.specimens,
+      },
+    ];
+  }, [] as Array<ValueAssignedSpecimens<T>>);
+
+  return integer(Range.constant(0, totalWeight)).bind(
+    (value) => valueAssignedSpecimens.find((x) => x.minValue <= value && value <= x.maxValue)!.specimens,
+  );
+};
