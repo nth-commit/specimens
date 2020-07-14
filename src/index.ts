@@ -1,5 +1,4 @@
 export * from './Specimens';
-export * from './Specimen';
 export * from './Numeric';
 export * from './Random';
 export * from './Range';

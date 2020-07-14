@@ -1,10 +1,11 @@
-import { Specimens, IntegerRange, Seed, Exhausted, Specimen } from '../src';
+import * as S from '../src/Specimens';
+import { IntegerRange, Seed, Exhausted, Specimen } from '../src';
 import { sample, generateOneTree, EvaluatedTree, sampleSpecimens, SeedMock } from './Util';
 
 describe('Specimens.bind', () => {
   test('Exhausts if original specimen is exhausted', () => {
-    const specimens = Specimens.rejected();
-    const specimensK = specimens.bind(() => Specimens.constant(1));
+    const specimens = S.rejected();
+    const specimensK = specimens.bind(() => S.constant(1));
 
     const result = sampleSpecimens(specimensK, 11);
 
@@ -12,8 +13,8 @@ describe('Specimens.bind', () => {
   });
 
   test('Exhausts if k returns an exhausted specimen', () => {
-    const specimens = Specimens.constant(1);
-    const specimensK = specimens.bind(() => Specimens.rejected());
+    const specimens = S.constant(1);
+    const specimensK = specimens.bind(() => S.rejected());
 
     const result = sampleSpecimens(specimensK, 11);
 
@@ -21,22 +22,22 @@ describe('Specimens.bind', () => {
   });
 
   test('Returns if original specimen is infinite', () => {
-    const specimens = Specimens.infinite(1);
-    const specimensK = specimens.bind(() => Specimens.constant(2));
+    const specimens = S.infinite(1);
+    const specimensK = specimens.bind(() => S.constant(2));
 
     sample(specimensK, 100);
   });
 
   test('Returns if k returns a infinite specimen', () => {
-    const specimens = Specimens.constant(2);
-    const specimensK = specimens.bind(() => Specimens.infinite(1));
+    const specimens = S.constant(2);
+    const specimensK = specimens.bind(() => S.infinite(1));
 
     sample(specimensK, 100);
   });
 
   test('Binds a trivial specimens', () => {
-    const k = (): Specimens<number> => Specimens.constant(2);
-    const specimens = Specimens.constant(1);
+    const k = (): S.Specimens<number> => S.constant(2);
+    const specimens = S.constant(1);
     const specimens0 = specimens.bind(k);
 
     const result = sampleSpecimens(specimens0, 10);
@@ -45,8 +46,8 @@ describe('Specimens.bind', () => {
   });
 
   test('Binding to a constant preserves the structure of the shrinks', () => {
-    const k = (): Specimens<number> => Specimens.constant(2);
-    const specimens = Specimens.integer(IntegerRange.constant(0, 10));
+    const k = (): S.Specimens<number> => S.constant(2);
+    const specimens = S.integer(IntegerRange.constant(0, 10));
     const specimens0 = specimens.bind(k);
 
     // const seed = Seed.spawn();

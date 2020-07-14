@@ -16,7 +16,7 @@ export type Numeric<N> = {
 
 export default Numeric;
 
-export const Integer: Numeric<number> = {
+export const integerNumeric: Numeric<number> = {
   ZERO: 0,
   ONE: 1,
   add: (l, r) => l + r,

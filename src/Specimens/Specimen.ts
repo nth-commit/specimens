@@ -32,3 +32,5 @@ export namespace Specimen {
     onRejected: () => TMatchRejected,
   ): TMatchAccepted | TMatchRejected => (s.kind === 'accepted' ? onAccepted(s.value) : onRejected());
 }
+
+export default Specimen;

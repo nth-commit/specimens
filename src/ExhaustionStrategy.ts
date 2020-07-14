@@ -1,5 +1,5 @@
-import { Specimen } from './Specimen';
-import { Tree } from './Tree';
+import { Specimen } from './Specimens';
+import Tree from './Tree';
 
 export const Exhausted = Symbol('Exhausted');
 

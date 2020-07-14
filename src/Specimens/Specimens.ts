@@ -1,12 +1,12 @@
-import Numeric, { Integer } from './Numeric';
-import { Random } from './Random';
-import Sequence from './Sequence';
-import Range, { Size, IntegerRange } from './Range';
-import Shrink from './Shrink';
-import Seed from './Seed';
-import { Tree } from './Tree';
-import { Specimen } from './Specimen';
-import ExhaustionStrategy, { Exhausted } from './ExhaustionStrategy';
+import Numeric, { integerNumeric } from '../Numeric';
+import { Random } from '../Random';
+import Sequence from '../Sequence';
+import Range, { Size, IntegerRange } from '../Range';
+import Shrink from '../Shrink';
+import Seed from '../Seed';
+import Tree from '../Tree';
+import ExhaustionStrategy, { Exhausted } from '../ExhaustionStrategy';
+import Specimen from './Specimen';
 
 export type MaybeExhaustedSpecimen<T> = Specimen<T> | typeof Exhausted;
 
@@ -26,7 +26,7 @@ export type Specimens<T> = {
 
 const id = <T>(x: T): T => x;
 
-class SpecimensBuilder<T> implements Specimens<T> {
+export class SpecimensBuilder<T> implements Specimens<T> {
   constructor(readonly random: Random<Specimen<Tree<T>>>) {}
 
   run(seed: Seed, size: Size): Sequence<Specimen<Tree<T>>> {
@@ -138,97 +138,4 @@ class SpecimensBuilder<T> implements Specimens<T> {
   }
 }
 
-export namespace Specimens {
-  export const create = <T>(r: Random<T>, shrinker: (x: T) => Sequence<T>): Specimens<T> =>
-    new SpecimensBuilder<T>(r.map((x) => Specimen.accepted(Tree.unfold(id, shrinker, x))));
-
-  export const rejected = <T>(): Specimens<T> => new SpecimensBuilder(Random.constant(Specimen.rejected()));
-
-  export const constant = <T>(x: T): Specimens<T> => create(Random.constant(x), Shrink.none());
-
-  export const infinite = <T>(x: T): Specimens<T> => create(Random.infinite(x), Shrink.none());
-
-  export const integral = <N>(numeric: Numeric<N>, range: Range<N>): Specimens<N> =>
-    create(Random.integral(numeric, range), Shrink.towards(numeric, range.origin));
-
-  export const integer = (range: Range<number>): Specimens<number> => integral(Integer, range);
-
-  export const item = <T>(arr: Array<T>): Specimens<T> => {
-    if (arr.length === 0) {
-      return rejected();
-    }
-
-    const range = IntegerRange.constant(0, arr.length - 1);
-    return integer(range).map((ix) => arr[ix]);
-  };
-
-  export const map2 = <T1, T2, U>(sx: Specimens<T1>, sy: Specimens<T2>, f: (x: T1, y: T2) => U): Specimens<U> =>
-    sx.bind((x) => sy.bind((y) => constant(f(x, y))));
-
-  export const zip = <T1, T2>(sx: Specimens<T1>, sy: Specimens<T2>): Specimens<[T1, T2]> =>
-    map2(sx, sy, (x, y) => [x, y]);
-
-  export const concat = <T>(sx: Specimens<T>, sy: Specimens<T>): Specimens<T> =>
-    new SpecimensBuilder(
-      Random.from((seed, size) => {
-        const [leftSeed, rightSeed] = seed.split();
-        return Sequence.fromGenerator(function* () {
-          yield* sx.run(leftSeed, size);
-          yield* sy.run(rightSeed, size);
-        });
-      }),
-    );
-
-  export const unfold = <T>(initial: T, generator: (prev: T) => Specimens<T>): Specimens<T> =>
-    generator(initial).bind((x) => concat(constant(x), unfold(x, generator)));
-
-  export const fromStateMachine = <State, Action>(
-    initialState: State,
-    transition: (s: State, a: Action) => State,
-    generateAction: (s: State) => Specimens<Action>,
-  ): Specimens<State> => unfold<State>(initialState, (s) => generateAction(s).map((a) => transition(s, a)));
-
-  export const Terminated = Symbol('Terminated');
-  export const InvalidTransition = Symbol('Terminated');
-
-  export type ActionSpecimenDefinitionResult<Action> = Specimens<Action> | typeof InvalidTransition | typeof Terminated;
-
-  export type ActionSpecimenDefinition<State, Action> =
-    | typeof InvalidTransition
-    | ((state: State) => ActionSpecimenDefinitionResult<Action>);
-
-  export type ActionSpecimenDefinitions<State, Action extends { type: string }> = {
-    [P in Action['type']]: ActionSpecimenDefinition<State, Action>;
-  };
-
-  export const fromReducer = <State, Action extends { type: string }>(
-    initialState: State,
-    reducer: (s: State, a: Action) => State,
-    actions: ActionSpecimenDefinitions<State, Action>,
-  ): Specimens<State> => {
-    const generateAction = (state: State): Specimens<Action> => {
-      const isNotUndefined = <T>(x: T | undefined): x is T => x !== undefined;
-
-      const actionSpecimensDefinitions = Object.values(actions) as Array<ActionSpecimenDefinition<State, Action>>;
-
-      const applicableActionSpecimenDefinitions = actionSpecimensDefinitions
-        .map((actionSpecimenDefinition) => {
-          if (actionSpecimenDefinition === InvalidTransition) {
-            return undefined;
-          }
-
-          const result = actionSpecimenDefinition(state);
-          if (result === InvalidTransition || result === Terminated) {
-            return undefined;
-          }
-
-          return result;
-        })
-        .filter(isNotUndefined);
-
-      return Specimens.item(applicableActionSpecimenDefinitions).bind((x) => x);
-    };
-
-    return fromStateMachine(initialState, reducer, generateAction);
-  };
-}
+export default Specimens;

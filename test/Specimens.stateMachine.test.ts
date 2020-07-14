@@ -1,4 +1,5 @@
-import { Specimens, Seed, Exhausted, Specimen, IntegerRange } from '../src';
+import { Seed, Exhausted, Specimen, Range } from '../src';
+import * as S from '../src/Specimens';
 import { generateSpecimens } from './Util';
 
 type TodoListAction =
@@ -163,35 +164,33 @@ describe('Specimens.stateMachine', () => {
     });
   });
 
-  const terminateIfFailedOr = (
-    continueWith: (s: TodoListOkState) => Specimens.ActionSpecimenDefinitionResult<TodoListAction>,
-  ) => (state: TodoListState): Specimens.ActionSpecimenDefinitionResult<TodoListAction> =>
-    state.type === 'fail' ? Specimens.Terminated : continueWith(state);
+  const terminateIfFailedOr = (continueWith: (s: TodoListOkState) => S.ReducerTransition<TodoListAction>) => (
+    state: TodoListState,
+  ): S.ReducerTransition<TodoListAction> => (state.type === 'fail' ? S.Terminated : continueWith(state));
 
-  const reducerSpecimens = Specimens.fromReducer(INITIAL_STATE, todoListReducer, {
+  const reducerSpecimens = S.fromReducer(INITIAL_STATE, todoListReducer, {
     add: terminateIfFailedOr((state) =>
-      Specimens.integer(IntegerRange.constant(0, 9999))
+      S.integer(Range.constant(0, 9999))
         .map((id) => id.toString())
         .filter((id) => state.todoOrder.includes(id) === false)
         .map<TodoListAction>((id) => ({ type: 'add', text: '', id })),
     ),
     delete: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? Specimens.InvalidTransition
-        : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
+        ? S.InvalidTransition
+        : S.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'delete', id })),
     ),
     toggle: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? Specimens.InvalidTransition
-        : Specimens.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
+        ? S.InvalidTransition
+        : S.item(state.todoOrder).map<TodoListAction>((id) => ({ type: 'toggle', id })),
     ),
     move: terminateIfFailedOr((state) =>
       state.todoOrder.length === 0
-        ? Specimens.InvalidTransition
-        : Specimens.zip(
-            Specimens.item(state.todoOrder),
-            Specimens.integer(IntegerRange.constant(0, state.todoOrder.length - 1)),
-          ).map<TodoListAction>(([id, toIndex]) => ({ type: 'move', id, toIndex })),
+        ? S.InvalidTransition
+        : S.zip(S.item(state.todoOrder), S.integer(Range.constant(0, state.todoOrder.length - 1))).map<TodoListAction>(
+            ([id, toIndex]) => ({ type: 'move', id, toIndex }),
+          ),
     ),
   });
 

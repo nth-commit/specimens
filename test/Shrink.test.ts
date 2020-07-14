@@ -1,4 +1,4 @@
-import { Shrink, Integer } from '../src';
+import { Shrink, integerNumeric } from '../src';
 
 describe('Shrink.towards', () => {
   type ShrinkTowardsTest<N> = {
@@ -13,7 +13,7 @@ describe('Shrink.towards', () => {
     ${74}   | ${10}       | ${[10, 42, 26, 18, 14, 12, 11]}
     ${-64}  | ${0}        | ${[0, -32, -16, -8, -4, -2, -1]}
   `('<integer>', ({ subject, destination, expectedShrinks }: ShrinkTowardsTest<number>) => {
-    const shrinker = Shrink.towards(Integer, destination);
+    const shrinker = Shrink.towards(integerNumeric, destination);
 
     const shrinks = shrinker(subject);
 

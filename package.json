@@ -16,6 +16,7 @@
     "pure-rand": "^2.0.0"
   },
   "scripts": {
+    "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watchAll",
     "scratch": "ts-node --project tsconfig.json scripts/scratch.ts"
