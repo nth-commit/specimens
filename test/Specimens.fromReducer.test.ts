@@ -1,6 +1,6 @@
-import { Seed, Exhausted, Specimen, Range } from '../src';
+import { Seed, Range } from '../src';
 import * as S from '../src/Specimens';
-import { generateSpecimens, generate } from './Util';
+import { generate } from './Util';
 
 type TodoListAction =
   | { type: 'add'; id: string; text: string }
@@ -205,13 +205,11 @@ describe('Specimens.stateMachine', () => {
     });
   });
 
-  test('It is able to produce exclusively accepted specimens', () => {
-    const specimens = generateSpecimens(reducerSpecimens, Seed.spawn(), 100);
+  test('It is able to avoid exhaustion', () => {
+    const stats = S.metaStatistics(reducerSpecimens);
 
-    specimens.forEach((specimen) => {
-      expect(specimen).not.toEqual(Exhausted);
-      expect(specimen).toHaveProperty('kind', 'accepted');
-    });
+    expect(stats.classifications.rejected.count).toEqual(0);
+    expect(stats.exhausted).toEqual(false);
   });
 
   test('It is able to avoid the failure state of the reducer', () => {

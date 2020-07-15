@@ -31,4 +31,5 @@ const loggingSeedDecorator = (seed: S.Seed, idPath: Array<'L' | 'R'> = []): S.Se
 // }
 
 const specimens = S.integer(S.Range.constant(0, 10));
-S.printStatistics(specimens, (s) => s.toString(), { sampleSize: 1000000 });
+S.printStatistics(specimens, (s) => s.toString(), { sampleSize: 10000 });
+S.printMetaStatistics(specimens.filter((x) => x > 10));
